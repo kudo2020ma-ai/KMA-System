@@ -1,0 +1,1370 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام KMA - تسجيل الدخول</title>
+    <link href="https://googleapis.com" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #0ea5e9;
+            --primary-hover: #0284c7;
+            --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+            --glass-bg: rgba(255, 255, 255, 0.08);
+            --glass-border: rgba(255, 255, 255, 0.15);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Tajawal', sans-serif;
+        }
+
+        body {
+            min-height: 100vh;
+            background: var(--bg-gradient);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow-x: hidden;
+            position: relative;
+            color: var(--text-main);
+        }
+
+        /* لمسات فنية: دوائر إضاءة خلفية متحركة */
+        .circle {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            z-index: 0;
+            animation: float 8s infinite alternate ease-in-out;
+            pointer-events: none;
+        }
+        .circle-1 {
+            width: 300px;
+            height: 300px;
+            background: rgba(14, 165, 233, 0.35);
+            top: 10%;
+            left: 15%;
+        }
+        .circle-2 {
+            width: 350px;
+            height: 350px;
+            background: rgba(99, 102, 241, 0.3);
+            bottom: 10%;
+            right: 15%;
+            animation-delay: 2s;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0px) scale(1); }
+            100% { transform: translateY(-30px) scale(1.1); }
+        }
+
+        /* حاوية تسجيل الدخول الزجاجية */
+        .login-card {
+            position: relative;
+            z-index: 1;
+            width: 92%;
+            max-width: 420px;
+            padding: 40px 35px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            transition: all 0.3s ease;
+        }
+
+        /* زر تغيير اللغة */
+        .lang-btn {
+            position: absolute;
+            top: 20px;
+            inset-inline-end: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--glass-border);
+            color: var(--text-main);
+            padding: 6px 14px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: 0.3s;
+        }
+
+        .lang-btn:hover {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+
+        /* شعار وعنوان النظام */
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            margin-top: 10px;
+        }
+
+        .logo-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 2.4rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        /* حقول الإدخال */
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+            color: #cbd5e1;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 14px 16px;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            color: #fff;
+            font-size: 1rem;
+            outline: none;
+            transition: 0.3s;
+        }
+
+        .input-group input:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2);
+        }
+
+        /* زر الدخول */
+        .submit-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #0ea5e9, #2563eb);
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 10px;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px -5px rgba(14, 165, 233, 0.4);
+        }
+
+        /* رسالة التنبيه */
+        .message {
+            margin-top: 15px;
+            text-align: center;
+            font-size: 0.9rem;
+            min-height: 22px;
+            font-weight: 500;
+        }
+        .error { color: #f87171; }
+        .success { color: #4ade80; }
+/* تنسيق الإدارات الخمس - Step 2: Departments CSS */
+.dashboard-box { display: none; position: relative; z-index: 1; width: 94%; max-width: 1100px; padding: 25px; }
+.top-bar { display: flex; justify-content: space-between; align-items: center; background: var(--glass-bg); backdrop-filter: blur(16px); border: 1px solid var(--glass-border); padding: 15px 25px; border-radius: 18px; margin-bottom: 30px; }
+.top-bar h2 { background: linear-gradient(135deg, #38bdf8, #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 1.6rem; }
+.logout-btn { background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; padding: 6px 14px; border-radius: 12px; cursor: pointer; margin-inline-start: 8px; }
+.logout-btn:hover { background: #ef4444; color: #fff; }
+.dash-title { text-align: center; margin-bottom: 28px; }
+.dash-title h3 { font-size: 1.6rem; margin-bottom: 5px; }
+.dash-title p { color: var(--text-muted); font-size: 0.95rem; }
+.cards-area { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; }
+.dept-card { flex: 1 1 290px; max-width: 330px; background: var(--glass-bg); backdrop-filter: blur(16px); border: 1px solid var(--glass-border); border-radius: 22px; padding: 28px 22px; text-align: center; cursor: pointer; transition: 0.3s; position: relative; }
+.dept-card:hover { transform: translateY(-6px); border-color: var(--primary-color); background: rgba(255, 255, 255, 0.12); box-shadow: 0 15px 30px -10px rgba(14, 165, 233, 0.35); }
+.dept-num { position: absolute; top: 15px; inset-inline-start: 18px; font-size: 0.8rem; color: #38bdf8; background: rgba(255, 255, 255, 0.07); padding: 3px 10px; border-radius: 8px; }
+.dept-icon { font-size: 2.5rem; margin-bottom: 12px; display: block; }
+.dept-name { font-size: 1.25rem; font-weight: 700; margin-bottom: 8px; color: #fff; }
+.dept-info { font-size: 0.88rem; color: var(--text-muted); }
+    /* تنسيق إدارة النظام - Step 3 Part 1 CSS */
+.module-workspace { display: none; position: relative; z-index: 1; width: 95%; max-width: 1150px; padding: 20px; }
+.workspace-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 15px; background: var(--glass-bg); backdrop-filter: blur(16px); border: 1px solid var(--glass-border); padding: 15px 25px; border-radius: 18px; margin-bottom: 25px; }
+.back-btn { background: rgba(14, 165, 233, 0.2); border: 1px solid rgba(14, 165, 233, 0.4); color: #7dd3fc; padding: 8px 16px; border-radius: 12px; cursor: pointer; font-weight: 600; transition: 0.3s; }
+.back-btn:hover { background: var(--primary-color); color: #fff; }
+.workspace-body { display: grid; grid-template-columns: 260px 1fr; gap: 22px; }
+@media (max-width: 768px) { .workspace-body { grid-template-columns: 1fr; } }
+.side-menu { background: var(--glass-bg); backdrop-filter: blur(16px); border: 1px solid var(--glass-border); border-radius: 20px; padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+.menu-item { background: rgba(255, 255, 255, 0.04); border: 1px solid transparent; color: var(--text-main); padding: 12px 16px; border-radius: 12px; text-align: start; cursor: pointer; font-size: 0.95rem; font-weight: 500; transition: 0.3s; }
+.menu-item:hover, .menu-item.active { background: rgba(14, 165, 233, 0.2); border-color: var(--primary-color); color: #38bdf8; }
+.content-panel { background: var(--glass-bg); backdrop-filter: blur(16px); border: 1px solid var(--glass-border); border-radius: 20px; padding: 28px; min-height: 360px; }
+.panel-section { display: none; }
+.panel-section.active { display: block; }
+.panel-title { font-size: 1.35rem; margin-bottom: 20px; color: #38bdf8; border-bottom: 1px solid var(--glass-border); padding-bottom: 12px; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 20px; }
+.sys-input-box label { display: block; font-size: 0.88rem; color: var(--text-muted); margin-bottom: 6px; }
+.sys-input-box input, .sys-input-box select { width: 100%; padding: 11px 14px; background: rgba(15, 23, 42, 0.65); border: 1px solid var(--glass-border); border-radius: 10px; color: #fff; outline: none; }
+.action-btn { background: linear-gradient(135deg, #0ea5e9, #2563eb); border: none; color: #fff; padding: 11px 24px; border-radius: 12px; font-weight: 700; cursor: pointer; transition: 0.3s; }
+.action-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px -5px rgba(14, 165, 233, 0.5); }
+.data-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.9rem; }
+.data-table th, .data-table td { padding: 12px; text-align: start; border-bottom: 1px solid var(--glass-border); }
+.data-table th { color: #38bdf8; background: rgba(255, 255, 255, 0.03); }
+
+</style>
+</head>
+<body>
+
+    <!-- عناصر فنية في الخلفية -->
+    <div class="circle circle-1"></div>
+    <div class="circle circle-2"></div>
+
+    <div class="login-card">
+        <button type="button" class="lang-btn" id="langToggle" onclick="toggleLanguage()">English</button>
+
+        <div class="header">
+            <div class="logo-badge" id="systemTitle">نظام KMA</div>
+            <p class="subtitle" id="systemSubtitle">تسجيل الدخول للنظام</p>
+        </div>
+
+        <form id="loginForm" onsubmit="handleLogin(event)">
+            <div class="input-group">
+                <label for="username" id="userLabel">اسم المستخدم</label>
+                <input type="text" id="username" placeholder="أدخل اسم المستخدم" required autocomplete="off">
+            </div>
+
+            <div class="input-group">
+                <label for="password" id="passLabel">كلمة المرور</label>
+                <input type="password" id="password" placeholder="أدخل كلمة المرور" required>
+            </div>
+
+            <button type="submit" class="submit-btn" id="loginBtn">تسجيل الدخول</button>
+            <div class="message" id="msgBox"></div>
+        </form>
+</div>
+<!-- شاشة الإدارات الخمس الرئيسية - Step 2: Departments HTML -->
+<section class="dashboard-box" id="dashboardScreen">
+    <header class="top-bar">
+        <h2 id="dashLogo">نظام KMA</h2>
+        <nav>
+            <button type="button" class="lang-btn" style="position:static;" id="dashLangBtn" onclick="toggleLanguage()">English</button>
+            <button type="button" class="logout-btn" id="dashLogoutBtn" onclick="logoutSystem()">خروج</button>
+        </nav>
+    </header>
+    <header class="dash-title">
+        <h3 id="dashMainTitle">الإدارات الرئيسية للنظام</h3>
+        <p id="dashSubTitle">اختر الإدارة للانتقال إلى شاشات العمل</p>
+    </header>
+    <section class="cards-area">
+        <article class="dept-card" onclick="selectDept(1)">
+            <span class="dept-num">01</span>
+            <span class="dept-icon">⚙️</span>
+            <h4 class="dept-name" id="d1Name">إدارة النظام</h4>
+            <p class="dept-info" id="d1Desc">الإعدادات العامة، الصلاحيات، والمستخدمين</p>
+        </article>
+        <article class="dept-card" onclick="selectDept(2)">
+            <span class="dept-num">02</span>
+            <span class="dept-icon">📊</span>
+            <h4 class="dept-name" id="d2Name">إدارة الحسابات</h4>
+            <p class="dept-info" id="d2Desc">دليل الحسابات، القيود، والتقارير المالية</p>
+        </article>
+        <article class="dept-card" onclick="selectDept(3)">
+            <span class="dept-num">03</span>
+            <span class="dept-icon">📦</span>
+            <h4 class="dept-name" id="d3Name">إدارة المخزون</h4>
+            <p class="dept-info" id="d3Desc">الأصناف، المستودعات، وحركة الجرد</p>
+        </article>
+        <article class="dept-card" onclick="selectDept(4)">
+            <span class="dept-num">04</span>
+            <span class="dept-icon">🛒</span>
+            <h4 class="dept-name" id="d4Name">إدارة المشتريات</h4>
+            <p class="dept-info" id="d4Desc">الموردين، فواتير الشراء، وأوامر التوريد</p>
+        </article>
+        <article class="dept-card" onclick="selectDept(5)">
+            <span class="dept-num">05</span>
+            <span class="dept-icon">💼</span>
+            <h4 class="dept-name" id="d5Name">إدارة المبيعات</h4>
+            <p class="dept-info" id="d5Desc">العملاء، فواتير المبيعات، ونقاط البيع</p>
+        </article>
+    </section>
+</section>
+    </div>
+<!-- شاشة إدارة النظام - Step 3 Part 1 HTML -->
+<section class="module-workspace" id="systemAdminScreen">
+    <header class="workspace-header">
+        <div style="display:flex; align-items:center; gap:12px;">
+            <button type="button" class="back-btn" id="backToMainBtn" onclick="returnToDepartments()">→ الرئيسية</button>
+            <h2 id="sysScreenTitle" style="font-size:1.4rem; color:#38bdf8;">⚙️ إدارة النظام</h2>
+        </div>
+        <button type="button" class="lang-btn" style="position:static;" id="sysLangBtn" onclick="toggleLanguage()">English</button>
+    </header>
+
+    <div class="workspace-body">
+        <aside class="side-menu" id="sysSideMenu">
+            <button type="button" class="menu-item active" id="tabBtn1" onclick="switchSysTab(1)">🏢 تهيئة بيانات المنشأة</button>
+        <button type="button" class="menu-item" id="tabBtn2" onclick="switchSysTab(2)">👥 إدارة المستخدمين</button>
+<button type="button" class="menu-item" id="tabBtn3" onclick="switchSysTab(3)">📅 السنوات المالية</button>
+<button type="button" class="menu-item" id="tabBtn4" onclick="switchSysTab(4)">💾 النسخ الاحتياطي</button>
+
+</aside>
+
+        <main class="content-panel" id="sysContentPanel">
+            <!-- 1. تهيئة المنشأة + السجل التجاري + العنوان الوطني -->
+            <div class="panel-section active" id="sysTab1">
+                <h3 class="panel-title" id="pTitle1">تهيئة البيانات الأساسية للمنشأة</h3>
+                <div class="form-grid">
+                    <div class="sys-input-box">
+                        <label id="lblCompName">اسم الشركة / المؤسسة</label>
+                        <input type="text" id="compNameInput" value="شركة KMA للتجارة والمقاولات">
+                    </div>
+<!-- حقل رفع وعرض شعار الشركة (Company Logo) -->
+<div class="sys-input-box">
+    <label id="lblCompLogo">شعار الشركة (Company Logo)</label>
+    <div style="display:flex; align-items:center; gap:10px;">
+        <input type="file" id="logoFileInput" accept="image/*" onchange="previewCompanyLogo(event)" style="padding:8px;">
+        <img id="logoPreviewImg" src="" alt="Logo" style="display:none; width:44px; height:44px; object-fit:contain; border-radius:10px; border:1px solid var(--glass-border); background:rgba(255,255,255,0.08); padding:3px;">
+    </div>
+</div>
+
+                    <div class="sys-input-box">
+                        <label id="lblTaxNum">الرقم الضريبي</label>
+                        <input type="text" id="taxNumInput" placeholder="أدخل الرقم الضريبي">
+                    </div>
+                    <div class="sys-input-box">
+                        <label id="lblCurrency">العملة الافتراضية</label>
+                        <select id="currencySelect">
+                            <option value="SAR">ريال سعودي (SAR)</option>
+                            <option value="YER">ريال يمني (YER)</option>
+                            <option value="USD">دولار أمريكي (USD)</option>
+                        </select>
+                    </div>
+                    <div class="sys-input-box">
+                        <label id="lblCrNum">رقم السجل التجاري (Commercial Reg.)</label>
+                        <input type="text" id="crNumInput" maxlength="10" placeholder="أدخل رقم السجل التجاري">
+                    </div>
+                    <div class="sys-input-box">
+                        <label id="lblBuildingNo">رقم المبنى (4 أرقام)</label>
+                        <input type="text" id="buildingNoInput" maxlength="4" placeholder="مثال: 1234">
+                    </div>
+                    <div class="sys-input-box">
+                        <label id="lblStreetName">اسم الشارع (Street Name)</label>
+                        <input type="text" id="streetNameInput" placeholder="الشارع الذي يقع عليه المدخل الرئيسي">
+                    </div>
+                    <div class="sys-input-box">
+                        <label id="lblDistrict">الحي (District)</label>
+                        <input type="text" id="districtInput" placeholder="اسم الحي الذي يتواجد فيه المبنى">
+                    </div>
+                    <div class="sys-input-box">
+                        <label id="lblCity">المدينة (City)</label>
+                        <input type="text" id="cityInput" placeholder="المدينة التي يقع فيها العنوان">
+                    </div>
+                    <div class="sys-input-box">
+                        <label id="lblPostalCode">الرمز البريدي (5 أرقام)</label>
+                        <input type="text" id="postalCodeInput" maxlength="5" placeholder="مثال: 24231">
+                    </div>
+                    <div class="sys-input-box">
+                        <label id="lblSubNumber">الرقم الفرعي / الإضافي (4 أرقام)</label>
+                        <input type="text" id="subNumberInput" maxlength="4" placeholder="مثال: 5678">
+                    </div>
+                </div>
+                <button type="button" class="action-btn" id="saveSettingsBtn" onclick="saveCompanySettings()">حفظ الإعدادات</button>
+                <p id="settingsStatus" style="margin-top:12px; color:#4ade80; font-size:0.9rem;"></p>
+            </div>
+<!-- 2. إدارة المستخدمين (User Management) -->
+<div class="panel-section" id="sysTab2">
+    <h3 class="panel-title" id="pTitle2">إدارة مستخدمي النظام</h3>
+    <div class="form-grid">
+        <div class="sys-input-box">
+            <label id="lblNewUser">اسم المستخدم الجديد</label>
+            <input type="text" id="newUsername" placeholder="مثال: محاسب 1">
+        </div>
+        <div class="sys-input-box">
+            <label id="lblNewPass">كلمة المرور</label>
+            <input type="password" id="newUserPass" placeholder="****">
+        </div>
+        <div class="sys-input-box">
+            <label id="lblUserRole">الصلاحية</label>
+            <select id="newUserRole">
+                <option value="مدير عام">مدير عام</option>
+                <option value="محاسب">محاسب</option>
+                <option value="أمين مخزن">أمين مخزن</option>
+            </select>
+        </div>
+    </div>
+    <button type="button" class="action-btn" id="addUserBtn" onclick="addSystemUser()">+ إضافة مستخدم</button>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th id="thUser">المستخدم</th>
+                <th id="thRole">الصلاحية</th>
+                <th id="thStatus">الحالة</th>
+            </tr>
+        </thead>
+        <tbody id="usersTableBody">
+            <tr>
+                <td>1 (Admin)</td>
+                <td>مدير عام</td>
+                <td style="color:#4ade80;">نشط</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- 3. السنوات المالية (Fiscal Years) -->
+<div class="panel-section" id="sysTab3">
+    <h3 class="panel-title" id="pTitle3">إدارة السنوات والفترات المالية</h3>
+    <div class="form-grid">
+        <div class="sys-input-box">
+            <label id="lblFiscalYear">السنة المالية</label>
+            <input type="number" id="fiscalYearInput" value="2026">
+        </div>
+        <div class="sys-input-box">
+            <label id="lblYearStatus">حالة الفترة</label>
+            <select id="yearStatusSelect">
+                <option value="مفتوحة">مفتوحة للعمليات</option>
+                <option value="مغلقة">مغلقة (للقراءة فقط)</option>
+            </select>
+        </div>
+    </div>
+    <button type="button" class="action-btn" id="activateYearBtn" onclick="activateFiscalYear()">اعتماد السنة المالية</button>
+    <p id="yearMsg" style="margin-top:12px; color:#4ade80; font-size:0.9rem;"></p>
+</div>
+<!-- 4. النسخ الاحتياطي والاستعادة (Backup & Restore) -->
+<div class="panel-section" id="sysTab4">
+    <h3 class="panel-title" id="pTitle4">النسخ الاحتياطي واستعادة البيانات</h3>
+    <p id="backupDesc" style="color:var(--text-muted); margin-bottom:20px; line-height:1.6;">
+        يمكنك تصدير نسخة احتياطية كاملة من بيانات المنشأة، الشعار، العنوان الوطني، والسنة المالية بصيغة ملف JSON.
+    </p>
+    <button type="button" class="action-btn" id="downloadBackupBtn" onclick="createSystemBackup()">📥 تحميل نسخة احتياطية الآن</button>
+    <p id="backupMsg" style="margin-top:12px; color:#38bdf8; font-size:0.9rem;"></p>
+
+    <hr style="border:0; border-top:1px solid var(--glass-border); margin:24px 0;">
+    <h4 id="restoreSubTitle" style="color:#38bdf8; margin-bottom:10px; font-size:1.1rem;">📤 استعادة نسخة احتياطية سابقة</h4>
+    <p id="restoreDesc" style="color:var(--text-muted); margin-bottom:15px; font-size:0.9rem;">
+        اختر ملف النسخة الاحتياطية (بصيغة JSON) من جهازك لاسترجاع إعدادات المنشأة والبيانات.
+    </p>
+    <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:center;">
+        <input type="file" id="restoreFileInput" accept=".json" style="background:rgba(15,23,42,0.65); border:1px solid var(--glass-border); padding:9px; border-radius:10px; color:#fff;">
+        <button type="button" class="action-btn" id="restoreBackupBtn" onclick="restoreSystemBackup()">🔄 استعادة النسخة الآن</button>
+    </div>
+    <p id="restoreMsg" style="margin-top:12px; font-size:0.9rem;"></p>
+</div>
+
+        </main>
+    </div>
+</section>
+<!-- شاشة إدارة الحسابات - Step 4 Part 1: Accounting Setup (Onyx Style) -->
+<section class="module-workspace" id="accountingScreen">
+    <header class="workspace-header">
+        <div style="display:flex; align-items:center; gap:12px;">
+            <button type="button" class="back-btn" id="accBackBtn" onclick="returnFromAccounting()">→ الرئيسية</button>
+            <h2 id="accScreenTitle" style="font-size:1.4rem; color:#818cf8;">📊 إدارة الحسابات (الأستاذ العام)</h2>
+        </div>
+        <button type="button" class="lang-btn" style="position:static;" id="accLangBtn" onclick="toggleLanguage()">English</button>
+    </header>
+
+    <div class="workspace-body">
+        <aside class="side-menu" id="accSideMenu">
+            <button type="button" class="menu-item active" id="accTabBtn1" onclick="switchAccTab(1)">🌳 الدليل المحاسبي (COA)</button>
+            <button type="button" class="menu-item" id="accTabBtn2" onclick="switchAccTab(2)">🏢 مراكز التكلفة (Cost Centers)</button>
+        </aside>
+
+        <main class="content-panel" id="accContentPanel">
+            <!-- 1. الدليل المحاسبي (Chart of Accounts) -->
+            <div class="panel-section active" id="accTab1">
+                <h3 class="panel-title" id="accPTitle1" style="color:#818cf8;">الدليل المحاسبي الشجري (Chart of Accounts)</h3>
+<!-- خيارات بناء الدليل المحاسبي الثلاث (تلقائي / إكسل / يدوي) -->
+<div style="background:rgba(99,102,241,0.1); border:1px solid rgba(129,140,248,0.3); border-radius:14px; padding:16px; margin-bottom:20px;">
+    <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; margin-bottom:12px;">
+        <button type="button" class="action-btn" id="autoCoaBtn" onclick="generateDefaultCOA()" style="background:linear-gradient(135deg, #10b981, #059669);">⚡ تنزيل دليل محاسبي قياسي تلقائياً</button>
+        <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+            <button type="button" class="back-btn" id="dlTemplateBtn" onclick="downloadExcelTemplate()" style="border-color:#818cf8; color:#c7d2fe;">📥 تحميل نموذج Excel (CSV)</button>
+            <input type="file" id="coaExcelInput" accept=".csv" style="background:rgba(15,23,42,0.65); border:1px solid var(--glass-border); padding:7px; border-radius:10px; color:#fff; font-size:0.85rem;">
+            <button type="button" class="action-btn" id="importCoaBtn" onclick="importCOAFromCSV()" style="background:linear-gradient(135deg, #f59e0b, #d97706);">📤 سحب من Excel</button>
+        </div>
+    </div>
+    <details style="color:var(--text-muted); font-size:0.86rem; cursor:pointer;">
+        <summary id="excelRulesSummary" style="color:#a5b4fc; font-weight:700;">📋 اضغط هنا لعرض شروط وآلية سحب الدليل من الإكسل (Excel / CSV)</summary>
+        <ul id="excelRulesList" style="margin-top:8px; padding-inline-start:20px; line-height:1.7;">
+            <li><strong>صيغة الملف:</strong> احفظ ملف الإكسل بصيغة <code>CSV UTF-8 (*.csv)</code> لدعم الحروف العربية.</li>
+            <li><strong>ترتيب الأعمدة (5 أعمدة):</strong> (1) رقم الحساب، (2) اسم الحساب، (3) المجموعة، (4) النوع [رئيسي/تحليلي]، (5) الطبيعة [مدين/دائن].</li>
+            <li><strong>الصف الأول:</strong> يُخصص للعناوين (Header) ويبدأ السحب تلقائياً من الصف الثاني.</li>
+            <li><strong>الرقابة ومنع التكرار:</strong> يتجاهل النظام أي رقم حساب موجود مسبقاً ويعرض ملخصاً بالحسابات المضافة.</li>
+        </ul>
+    </details>
+</div>
+
+                <div class="form-grid">
+                    <div class="sys-input-box">
+                        <label id="lblAccCode">رقم الحساب (Account No.)</label>
+                        <input type="text" id="accCodeInput" placeholder="مثال: 1103">
+                    </div>
+                    <div class="sys-input-box">
+                        <label id="lblAccName">اسم الحساب (Account Name)</label>
+                        <input type="text" id="accNameInput" placeholder="مثال: البنك الأهلي السعودي">
+                    </div>
+                    <div class="sys-input-box">
+                        <label id="lblAccGroup">المجموعة الرئيسية (Group)</label>
+                        <select id="accGroupSelect">
+                            <option value="الأصول (Assets)">1 - الأصول (Assets)</option>
+                            <option value="الخصوم (Liabilities)">2 - الخصوم (Liabilities)</option>
+                            <option value="حقوق الملكية (Equity)">3 - حقوق الملكية (Equity)</option>
+                            <option value="الإيرادات (Revenue)">4 - الإيرادات (Revenue)</option>
+                            <option value="المصروفات (Expenses)">5 - المصروفات (Expenses)</option>
+                        </select>
+                    </div>
+                    <div class="sys-input-box">
+                        <label id="lblAccLevel">نوع الحساب (Account Level)</label>
+                        <select id="accLevelSelect">
+                            <option value="تحليلي (يقبل الحركة)">تحليلي (يقبل الحركة)</option>
+                            <option value="رئيسي (تجميعي)">رئيسي (تجميعي)</option>
+                        </select>
+                    </div>
+                    <div class="sys-input-box">
+                        <label id="lblAccNature">طبيعة الحساب (Nature)</label>
+                        <select id="accNatureSelect">
+                            <option value="مدين (Debit)">مدين (Debit)</option>
+                            <option value="دائن (Credit)">دائن (Credit)</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="button" class="action-btn" id="addAccBtn" onclick="addAccountToChart()" style="background:linear-gradient(135deg, #6366f1, #4f46e5);">+ حفظ الحساب في الدليل</button>
+                <p id="accAddMsg" style="margin-top:10px; font-size:0.9rem;"></p>
+
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th id="thAccCode" style="color:#818cf8;">رقم الحساب</th>
+                            <th id="thAccName" style="color:#818cf8;">اسم الحساب</th>
+                            <th id="thAccGroup" style="color:#818cf8;">المجموعة</th>
+                            <th id="thAccLevel" style="color:#818cf8;">النوع</th>
+                            <th id="thAccNature" style="color:#818cf8;">الطبيعة</th>
+                        </tr>
+                    </thead>
+                    <tbody id="accountsTableBody">
+                        <tr><td>1101</td><td>الصندوق الرئيسي (Main Cash)</td><td>الأصول (Assets)</td><td>تحليلي (يقبل الحركة)</td><td>مدين (Debit)</td></tr>
+                        <tr><td>1102</td><td>البنك (Bank Account)</td><td>الأصول (Assets)</td><td>تحليلي (يقبل الحركة)</td><td>مدين (Debit)</td></tr>
+                        <tr><td>1201</td><td>العملاء (Customers)</td><td>الأصول (Assets)</td><td>تحليلي (يقبل الحركة)</td><td>مدين (Debit)</td></tr>
+                        <tr><td>2101</td><td>الموردون (Suppliers)</td><td>الخصوم (Liabilities)</td><td>تحليلي (يقبل الحركة)</td><td>دائن (Credit)</td></tr>
+                        <tr><td>2201</td><td>ضريبة القيمة المضافة (VAT)</td><td>الخصوم (Liabilities)</td><td>تحليلي (يقبل الحركة)</td><td>دائن (Credit)</td></tr>
+                        <tr><td>4101</td><td>إيرادات المبيعات (Sales Revenue)</td><td>الإيرادات (Revenue)</td><td>تحليلي (يقبل الحركة)</td><td>دائن (Credit)</td></tr>
+                        <tr><td>5101</td><td>مصروفات عمومية وإدارية (G&A Expenses)</td><td>المصروفات (Expenses)</td><td>تحليلي (يقبل الحركة)</td><td>مدين (Debit)</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 2. مراكز التكلفة (Cost Centers) -->
+            <div class="panel-section" id="accTab2">
+                <h3 class="panel-title" id="accPTitle2" style="color:#818cf8;">تهيئة مراكز التكلفة (Cost Centers)</h3>
+                <div class="form-grid">
+                    <div class="sys-input-box">
+                        <label id="lblCcCode">رمز المركز (Center Code)</label>
+                        <input type="text" id="ccCodeInput" placeholder="مثال: CC-03">
+                    </div>
+                    <div class="sys-input-box">
+                        <label id="lblCcName">اسم مركز التكلفة (Center Name)</label>
+                        <input type="text" id="ccNameInput" placeholder="مثال: فرع مكة المكرمة">
+                    </div>
+                </div>
+                <button type="button" class="action-btn" id="addCcBtn" onclick="addCostCenter()" style="background:linear-gradient(135deg, #6366f1, #4f46e5);">+ إضافة مركز تكلفة</button>
+                <p id="ccAddMsg" style="margin-top:10px; font-size:0.9rem;"></p>
+
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th id="thCcCode" style="color:#818cf8;">رمز المركز</th>
+                            <th id="thCcName" style="color:#818cf8;">اسم مركز التكلفة</th>
+                            <th id="thCcStatus" style="color:#818cf8;">الحالة</th>
+                        </tr>
+                    </thead>
+                    <tbody id="costCentersTableBody">
+                        <tr><td>CC-01</td><td>الإدارة العامة (Head Office)</td><td style="color:#4ade80;">نشط</td></tr>
+                        <tr><td>CC-02</td><td>الفرع الرئيسي (Main Branch)</td><td style="color:#4ade80;">نشط</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+</section>
+
+
+    <script>
+        let currentLang = 'ar';
+
+        const translations = {
+            ar: {
+                dir: 'rtl',
+                langBtn: 'English',
+                title: 'نظام KMA',
+                subtitle: 'تسجيل الدخول للنظام',
+                userLabel: 'اسم المستخدم',
+                userPlaceholder: 'أدخل اسم المستخدم',
+                passLabel: 'كلمة المرور',
+                passPlaceholder: 'أدخل كلمة المرور',
+                loginBtn: 'تسجيل الدخول',
+                successMsg: 'تم تسجيل الدخول بنجاح!',
+                errorMsg: 'اسم المستخدم أو كلمة المرور غير صحيحة!'
+            },
+            en: {
+                dir: 'ltr',
+                langBtn: 'العربية',
+                title: 'KMA System',
+                subtitle: 'System Login',
+                userLabel: 'Username',
+                userPlaceholder: 'Enter username',
+                passLabel: 'Password',
+                passPlaceholder: 'Enter password',
+                loginBtn: 'Login',
+                successMsg: 'Login successful!',
+                errorMsg: 'Invalid username or password!'
+            }
+        };
+
+        function toggleLanguage() {
+            currentLang = currentLang === 'ar' ? 'en' : 'ar';
+            const t = translations[currentLang];
+
+            document.documentElement.lang = currentLang;
+            document.documentElement.dir = t.dir;
+
+            document.getElementById('langToggle').innerText = t.langBtn;
+            document.getElementById('systemTitle').innerText = t.title;
+            document.getElementById('systemSubtitle').innerText = t.subtitle;
+            document.getElementById('userLabel').innerText = t.userLabel;
+            document.getElementById('username').placeholder = t.userPlaceholder;
+            document.getElementById('passLabel').innerText = t.passLabel;
+            document.getElementById('password').placeholder = t.passPlaceholder;
+            document.getElementById('loginBtn').innerText = t.loginBtn;
+            document.getElementById('msgBox').innerText = '';
+        }
+
+        function handleLogin(event) {
+            event.preventDefault();
+            const user = document.getElementById('username').value.trim();
+            const pass = document.getElementById('password').value.trim();
+            const msgBox = document.getElementById('msgBox');
+            const t = translations[currentLang];
+
+            if (user === '1' && pass === '1') {
+                msgBox.className = 'message success';
+                msgBox.innerText = t.successMsg;
+            } else {
+                msgBox.className = 'message error';
+                msgBox.innerText = t.errorMsg;
+            }
+        }
+  // برمجة الانتقال إلى الإدارات الخمس - Step 2: Departments JS
+handleLogin = function(event) {
+    event.preventDefault();
+    const user = document.getElementById('username').value.trim();
+    const pass = document.getElementById('password').value.trim();
+    const msgBox = document.getElementById('msgBox');
+    const t = translations[currentLang];
+
+    if (user === '1' && pass === '1') {
+        msgBox.className = 'message success';
+        msgBox.innerText = t.successMsg;
+        setTimeout(() => {
+            document.querySelector('.login-card').style.display = 'none';
+            document.getElementById('dashboardScreen').style.display = 'block';
+            msgBox.innerText = '';
+        }, 400);
+    } else {
+        msgBox.className = 'message error';
+        msgBox.innerText = t.errorMsg;
+    }
+};
+
+function logoutSystem() {
+    document.getElementById('username').value = '';
+    document.getElementById('password').value = '';
+    document.getElementById('dashboardScreen').style.display = 'none';
+    document.querySelector('.login-card').style.display = 'block';
+}
+
+function selectDept(num) {
+    const name = document.getElementById('d' + num + 'Name').innerText;
+    alert((currentLang === 'ar' ? 'تم اختيار: ' : 'Selected: ') + name);
+}
+
+const step1ToggleLang = toggleLanguage;
+toggleLanguage = function() {
+    step1ToggleLang();
+    const isAr = currentLang === 'ar';
+    document.getElementById('dashLangBtn').innerText = isAr ? 'English' : 'العربية';
+    document.getElementById('dashLogo').innerText = isAr ? 'نظام KMA' : 'KMA System';
+    document.getElementById('dashLogoutBtn').innerText = isAr ? 'خروج' : 'Logout';
+    document.getElementById('dashMainTitle').innerText = isAr ? 'الإدارات الرئيسية للنظام' : 'Main System Departments';
+    document.getElementById('dashSubTitle').innerText = isAr ? 'اختر الإدارة للانتقال إلى شاشات العمل' : 'Select a department to start working';
+
+    const depts = isAr ? [
+        ['إدارة النظام', 'الإعدادات العامة، الصلاحيات، والمستخدمين'],
+        ['إدارة الحسابات', 'دليل الحسابات، القيود، والتقارير المالية'],
+        ['إدارة المخزون', 'الأصناف، المستودعات، وحركة الجرد'],
+        ['إدارة المشتريات', 'الموردين، فواتير الشراء، وأوامر التوريد'],
+        ['إدارة المبيعات', 'العملاء، فواتير المبيعات، ونقاط البيع']
+    ] : [
+        ['System Administration', 'General settings, permissions, and users'],
+        ['Accounting Management', 'Chart of accounts, entries, and financial reports'],
+        ['Inventory Management', 'Items, warehouses, and stocktaking'],
+        ['Purchasing Management', 'Suppliers, purchase invoices, and supply orders'],
+        ['Sales Management', 'Customers, sales invoices, and point of sale']
+    ];
+
+    for (let i = 0; i < 5; i++) {
+        document.getElementById('d' + (i + 1) + 'Name').innerText = depts[i][0];
+        document.getElementById('d' + (i + 1) + 'Desc').innerText = depts[i][1];
+    }
+};
+// برمجة إدارة النظام - Step 3 Part 1 JS
+const step2SelectDept = selectDept;
+selectDept = function(num) {
+    if (num === 1) {
+        document.getElementById('dashboardScreen').style.display = 'none';
+        document.getElementById('systemAdminScreen').style.display = 'block';
+    } else {
+        step2SelectDept(num);
+    }
+};
+
+function returnToDepartments() {
+    document.getElementById('systemAdminScreen').style.display = 'none';
+    document.getElementById('dashboardScreen').style.display = 'block';
+}
+
+function switchSysTab(tabNum) {
+    document.querySelectorAll('.menu-item').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.panel-section').forEach(sec => sec.classList.remove('active'));
+    document.getElementById('tabBtn' + tabNum).classList.add('active');
+    document.getElementById('sysTab' + tabNum).classList.add('active');
+}
+
+function saveCompanySettings() {
+    const bNo = document.getElementById('buildingNoInput').value.trim();
+    const pCode = document.getElementById('postalCodeInput').value.trim();
+    const sNo = document.getElementById('subNumberInput').value.trim();
+    const msg = document.getElementById('settingsStatus');
+    const isAr = currentLang === 'ar';
+
+    if (bNo && !/^\d{4}$/.test(bNo)) {
+        msg.style.color = '#f87171';
+        msg.innerText = isAr ? '⚠️ رقم المبنى يجب أن يتكون من 4 أرقام!' : '⚠️ Building Number must be 4 digits!';
+        return;
+    }
+    if (pCode && !/^\d{5}$/.test(pCode)) {
+        msg.style.color = '#f87171';
+        msg.innerText = isAr ? '⚠️ الرمز البريدي يجب أن يتكون من 5 أرقام!' : '⚠️ Postal Code must be 5 digits!';
+        return;
+    }
+    if (sNo && !/^\d{4}$/.test(sNo)) {
+        msg.style.color = '#f87171';
+        msg.innerText = isAr ? '⚠️ الرقم الفرعي/الإضافي يجب أن يتكون من 4 أرقام!' : '⚠️ Additional Number must be 4 digits!';
+        return;
+    }
+
+    msg.style.color = '#4ade80';
+    msg.innerText = isAr ? '✔ تم حفظ بيانات المنشأة والسجل التجاري والعنوان الوطني بنجاح!' : '✔ Company & National Address settings saved!';
+    setTimeout(() => msg.innerText = '', 3500);
+}
+
+const part1ToggleLang = toggleLanguage;
+toggleLanguage = function() {
+    part1ToggleLang();
+    const isAr = currentLang === 'ar';
+    document.getElementById('sysLangBtn').innerText = isAr ? 'English' : 'العربية';
+    document.getElementById('backToMainBtn').innerText = isAr ? '→ الرئيسية' : '← Back';
+    document.getElementById('sysScreenTitle').innerText = isAr ? '⚙️ إدارة النظام' : '⚙️ System Administration';
+    document.getElementById('tabBtn1').innerText = isAr ? '🏢 تهيئة بيانات المنشأة' : '🏢 Company Setup';
+    document.getElementById('pTitle1').innerText = isAr ? 'تهيئة البيانات الأساسية للمنشأة' : 'Basic Company Configuration';
+    document.getElementById('saveSettingsBtn').innerText = isAr ? 'حفظ الإعدادات' : 'Save Settings';
+    document.getElementById('lblCompName').innerText = isAr ? 'اسم الشركة / المؤسسة' : 'Company / Establishment Name';
+    document.getElementById('lblTaxNum').innerText = isAr ? 'الرقم الضريبي' : 'VAT / Tax Number';
+    document.getElementById('lblCurrency').innerText = isAr ? 'العملة الافتراضية' : 'Default Currency';
+    document.getElementById('lblCrNum').innerText = isAr ? 'رقم السجل التجاري (Commercial Reg.)' : 'Commercial Registration No.';
+    document.getElementById('lblBuildingNo').innerText = isAr ? 'رقم المبنى (4 أرقام)' : 'Building Number (4 Digits)';
+    document.getElementById('lblStreetName').innerText = isAr ? 'اسم الشارع (Street Name)' : 'Street Name';
+    document.getElementById('lblDistrict').innerText = isAr ? 'الحي (District)' : 'District';
+    document.getElementById('lblCity').innerText = isAr ? 'المدينة (City)' : 'City';
+    document.getElementById('lblPostalCode').innerText = isAr ? 'الرمز البريدي (5 أرقام)' : 'Postal Code (5 Digits)';
+    document.getElementById('lblSubNumber').innerText = isAr ? 'الرقم الفرعي / الإضافي (4 أرقام)' : 'Additional / Sub Number (4 Digits)';
+};
+// برمجة المستخدمين والسنوات المالية - Step 3 Part 2 JS
+function addSystemUser() {
+    const name = document.getElementById('newUsername').value.trim();
+    const role = document.getElementById('newUserRole').value;
+    if (!name) return;
+
+    const tbody = document.getElementById('usersTableBody');
+    const row = document.createElement('tr');
+    row.innerHTML = `<td>${name}</td><td>${role}</td><td style="color:#4ade80;">${currentLang === 'ar' ? 'نشط' : 'Active'}</td>`;
+    tbody.appendChild(row);
+
+    document.getElementById('newUsername').value = '';
+    document.getElementById('newUserPass').value = '';
+}
+
+function activateFiscalYear() {
+    const yr = document.getElementById('fiscalYearInput').value;
+    const msg = document.getElementById('yearMsg');
+    msg.innerText = currentLang === 'ar' ? `✔ تم اعتماد السنة المالية (${yr}) بنجاح!` : `✔ Fiscal year (${yr}) activated!`;
+    setTimeout(() => msg.innerText = '', 3000);
+}
+
+const part2ToggleLang = toggleLanguage;
+toggleLanguage = function() {
+    part2ToggleLang();
+    const isAr = currentLang === 'ar';
+    document.getElementById('tabBtn2').innerText = isAr ? '👥 إدارة المستخدمين' : '👥 User Management';
+    document.getElementById('tabBtn3').innerText = isAr ? '📅 السنوات المالية' : '📅 Fiscal Years';
+    document.getElementById('pTitle2').innerText = isAr ? 'إدارة مستخدمي النظام' : 'System Users Management';
+    document.getElementById('pTitle3').innerText = isAr ? 'إدارة السنوات والفترات المالية' : 'Fiscal Years & Periods';
+    document.getElementById('lblNewUser').innerText = isAr ? 'اسم المستخدم الجديد' : 'New Username';
+    document.getElementById('lblNewPass').innerText = isAr ? 'كلمة المرور' : 'Password';
+    document.getElementById('lblUserRole').innerText = isAr ? 'الصلاحية' : 'Role / Permission';
+    document.getElementById('addUserBtn').innerText = isAr ? '+ إضافة مستخدم' : '+ Add User';
+    document.getElementById('thUser').innerText = isAr ? 'المستخدم' : 'User';
+    document.getElementById('thRole').innerText = isAr ? 'الصلاحية' : 'Role';
+    document.getElementById('thStatus').innerText = isAr ? 'الحالة' : 'Status';
+    document.getElementById('lblFiscalYear').innerText = isAr ? 'السنة المالية' : 'Fiscal Year';
+    document.getElementById('lblYearStatus').innerText = isAr ? 'حالة الفترة' : 'Period Status';
+    document.getElementById('activateYearBtn').innerText = isAr ? 'اعتماد السنة المالية' : 'Activate Year';
+};
+// برمجة رفع وعرض شعار الشركة (Company Logo)
+let currentCompanyLogoData = "";
+
+function previewCompanyLogo(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        currentCompanyLogoData = e.target.result;
+        const previewImg = document.getElementById('logoPreviewImg');
+        previewImg.src = currentCompanyLogoData;
+        previewImg.style.display = 'block';
+
+        // تحديث الشعار في الشريط العلوي للإدارات الخمس تلقائياً
+        const dashLogo = document.getElementById('dashLogo');
+        if (dashLogo) {
+            const compName = document.getElementById('compNameInput').value || (currentLang === 'ar' ? 'نظام KMA' : 'KMA System');
+            dashLogo.innerHTML = `<img src="${currentCompanyLogoData}" style="height:34px; vertical-align:middle; margin-inline-end:10px; border-radius:8px;"> ${compName}`;
+        }
+    };
+    reader.readAsDataURL(file);
+}
+
+const logoToggleLang = toggleLanguage;
+toggleLanguage = function() {
+    logoToggleLang();
+    const isAr = currentLang === 'ar';
+    if (document.getElementById('lblCompLogo')) {
+        document.getElementById('lblCompLogo').innerText = isAr ? 'شعار الشركة (Company Logo)' : 'Company Logo';
+    }
+};
+// برمجة إنشاء واستعادة النسخة الاحتياطية - Step 3 Part 3 JS
+function createSystemBackup() {
+    const backupData = {
+        system: "KMA ERP",
+        company: document.getElementById('compNameInput').value,
+        logo: typeof currentCompanyLogoData !== 'undefined' ? currentCompanyLogoData : "",
+        taxNum: document.getElementById('taxNumInput').value,
+        currency: document.getElementById('currencySelect').value,
+        crNum: document.getElementById('crNumInput').value,
+        buildingNo: document.getElementById('buildingNoInput').value,
+        streetName: document.getElementById('streetNameInput').value,
+        district: document.getElementById('districtInput').value,
+        city: document.getElementById('cityInput').value,
+        postalCode: document.getElementById('postalCodeInput').value,
+        subNumber: document.getElementById('subNumberInput').value,
+        fiscalYear: document.getElementById('fiscalYearInput').value,
+        date: new Date().toLocaleString()
+    };
+    const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: "application/json" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "KMA_Backup_" + new Date().toISOString().slice(0, 10) + ".json";
+    link.click();
+
+    document.getElementById('backupMsg').innerText = currentLang === 'ar' ? '✔ تم تحميل ملف النسخة الاحتياطية على جهازك!' : '✔ Backup file downloaded!';
+}
+
+function restoreSystemBackup() {
+    const fileInput = document.getElementById('restoreFileInput');
+    const msg = document.getElementById('restoreMsg');
+    
+    if (!fileInput.files || fileInput.files.length === 0) {
+        msg.style.color = '#f87171';
+        msg.innerText = currentLang === 'ar' ? '⚠️ يرجى اختيار ملف النسخة الاحتياطية أولاً!' : '⚠️ Please select a backup file first!';
+        return;
+    }
+
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+
+    reader.onload = function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (data.system === "KMA ERP") {
+                if (data.company) document.getElementById('compNameInput').value = data.company;
+                if (data.taxNum) document.getElementById('taxNumInput').value = data.taxNum;
+                if (data.currency) document.getElementById('currencySelect').value = data.currency;
+                if (data.crNum) document.getElementById('crNumInput').value = data.crNum;
+                if (data.buildingNo) document.getElementById('buildingNoInput').value = data.buildingNo;
+                if (data.streetName) document.getElementById('streetNameInput').value = data.streetName;
+                if (data.district) document.getElementById('districtInput').value = data.district;
+                if (data.city) document.getElementById('cityInput').value = data.city;
+                if (data.postalCode) document.getElementById('postalCodeInput').value = data.postalCode;
+                if (data.subNumber) document.getElementById('subNumberInput').value = data.subNumber;
+                if (data.fiscalYear) document.getElementById('fiscalYearInput').value = data.fiscalYear;
+
+                if (data.logo) {
+                    currentCompanyLogoData = data.logo;
+                    const previewImg = document.getElementById('logoPreviewImg');
+                    if (previewImg) {
+                        previewImg.src = data.logo;
+                        previewImg.style.display = 'block';
+                    }
+                    const dashLogo = document.getElementById('dashLogo');
+                    if (dashLogo) {
+                        dashLogo.innerHTML = `<img src="${data.logo}" style="height:34px; vertical-align:middle; margin-inline-end:10px; border-radius:8px;"> ${data.company || 'KMA'}`;
+                    }
+                }
+                
+                msg.style.color = '#4ade80';
+                msg.innerText = currentLang === 'ar' 
+                    ? `✔ تمت استعادة النسخة الاحتياطية بنجاح! (تاريخ النسخة: ${data.date || 'غير محدد'})` 
+                    : `✔ Backup restored successfully! (Date: ${data.date || 'N/A'})`;
+                fileInput.value = '';
+            } else {
+                msg.style.color = '#f87171';
+                msg.innerText = currentLang === 'ar' ? '❌ هذا الملف لا يخص نظام KMA!' : '❌ Invalid KMA backup file!';
+            }
+        } catch (err) {
+            msg.style.color = '#f87171';
+            msg.innerText = currentLang === 'ar' ? '❌ حدث خطأ أثناء قراءة الملف!' : '❌ Error reading backup file!';
+        }
+    };
+
+    reader.readAsText(file);
+}
+
+const part3ToggleLang = toggleLanguage;
+toggleLanguage = function() {
+    part3ToggleLang();
+    const isAr = currentLang === 'ar';
+    document.getElementById('tabBtn4').innerText = isAr ? '💾 النسخ الاحتياطي' : '💾 Backup & Restore';
+    document.getElementById('pTitle4').innerText = isAr ? 'النسخ الاحتياطي واستعادة البيانات' : 'Backup & Data Export';
+    document.getElementById('backupDesc').innerText = isAr ? 'يمكنك تصدير نسخة احتياطية كاملة من بيانات المنشأة، الشعار، العنوان الوطني، والسنة المالية بصيغة ملف JSON.' : 'Export a full JSON backup of company details, logo, national address, and fiscal year.';
+    document.getElementById('downloadBackupBtn').innerText = isAr ? '📥 تحميل نسخة احتياطية الآن' : '📥 Download Backup Now';
+    document.getElementById('restoreSubTitle').innerText = isAr ? '📤 استعادة نسخة احتياطية سابقة' : '📤 Restore Previous Backup';
+    document.getElementById('restoreDesc').innerText = isAr ? 'اختر ملف النسخة الاحتياطية (بصيغة JSON) من جهازك لاسترجاع إعدادات المنشأة والبيانات.' : 'Select a JSON backup file from your device to restore system settings.';
+    document.getElementById('restoreBackupBtn').innerText = isAr ? '🔄 استعادة النسخة الآن' : '🔄 Restore Backup Now';
+};
+// برمجة إدارة الحسابات - Step 4 Part 1 JS
+let chartOfAccounts = [
+    { code: '1101', name: 'الصندوق الرئيسي (Main Cash)', group: 'الأصول (Assets)', level: 'تحليلي', nature: 'مدين' },
+    { code: '1102', name: 'البنك (Bank Account)', group: 'الأصول (Assets)', level: 'تحليلي', nature: 'مدين' },
+    { code: '1201', name: 'العملاء (Customers)', group: 'الأصول (Assets)', level: 'تحليلي', nature: 'مدين' },
+    { code: '2101', name: 'الموردون (Suppliers)', group: 'الخصوم (Liabilities)', level: 'تحليلي', nature: 'دائن' },
+    { code: '2201', name: 'ضريبة القيمة المضافة (VAT)', group: 'الخصوم (Liabilities)', level: 'تحليلي', nature: 'دائن' },
+    { code: '4101', name: 'إيرادات المبيعات (Sales Revenue)', group: 'الإيرادات (Revenue)', level: 'تحليلي', nature: 'دائن' },
+    { code: '5101', name: 'مصروفات عمومية وإدارية (G&A Expenses)', group: 'المصروفات (Expenses)', level: 'تحليلي', nature: 'مدين' }
+];
+
+let costCentersList = [
+    { code: 'CC-01', name: 'الإدارة العامة (Head Office)' },
+    { code: 'CC-02', name: 'الفرع الرئيسي (Main Branch)' }
+];
+
+const step3SelectDept = selectDept;
+selectDept = function(num) {
+    if (num === 2) {
+        document.getElementById('dashboardScreen').style.display = 'none';
+        document.getElementById('accountingScreen').style.display = 'block';
+    } else {
+        step3SelectDept(num);
+    }
+};
+
+function returnFromAccounting() {
+    document.getElementById('accountingScreen').style.display = 'none';
+    document.getElementById('dashboardScreen').style.display = 'block';
+}
+
+function switchAccTab(tabNum) {
+    document.querySelectorAll('#accountingScreen .menu-item').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('#accountingScreen .panel-section').forEach(sec => sec.classList.remove('active'));
+    document.getElementById('accTabBtn' + tabNum).classList.add('active');
+    document.getElementById('accTab' + tabNum).classList.add('active');
+}
+
+function addAccountToChart() {
+    const code = document.getElementById('accCodeInput').value.trim();
+    const name = document.getElementById('accNameInput').value.trim();
+    const group = document.getElementById('accGroupSelect').value;
+    const level = document.getElementById('accLevelSelect').value;
+    const nature = document.getElementById('accNatureSelect').value;
+    const msg = document.getElementById('accAddMsg');
+    const isAr = currentLang === 'ar';
+
+    if (!code || !name) {
+        msg.style.color = '#f87171';
+        msg.innerText = isAr ? '⚠️ يرجى إدخال رقم الحساب واسم الحساب!' : '⚠️ Please enter account number and name!';
+        return;
+    }
+
+    if (chartOfAccounts.some(a => a.code === code)) {
+        msg.style.color = '#f87171';
+        msg.innerText = isAr ? '⚠️ رقم الحساب موجود مسبقاً في الدليل!' : '⚠️ Account number already exists!';
+        return;
+    }
+
+    chartOfAccounts.push({ code, name, group, level: level.includes('تحليلي') ? 'تحليلي' : 'رئيسي', nature: nature.includes('مدين') ? 'مدين' : 'دائن' });
+
+    const tbody = document.getElementById('accountsTableBody');
+    const row = document.createElement('tr');
+    row.innerHTML = `<td>${code}</td><td>${name}</td><td>${group}</td><td>${level}</td><td>${nature}</td>`;
+    tbody.appendChild(row);
+
+    document.getElementById('accCodeInput').value = '';
+    document.getElementById('accNameInput').value = '';
+    msg.style.color = '#4ade80';
+    msg.innerText = isAr ? '✔ تم حفظ الحساب في الدليل المحاسبي بنجاح!' : '✔ Account saved to chart successfully!';
+    setTimeout(() => msg.innerText = '', 3000);
+}
+
+function addCostCenter() {
+    const code = document.getElementById('ccCodeInput').value.trim();
+    const name = document.getElementById('ccNameInput').value.trim();
+    const msg = document.getElementById('ccAddMsg');
+    const isAr = currentLang === 'ar';
+
+    if (!code || !name) {
+        msg.style.color = '#f87171';
+        msg.innerText = isAr ? '⚠️ يرجى إدخال رمز واسم مركز التكلفة!' : '⚠️ Please enter cost center code and name!';
+        return;
+    }
+
+    costCentersList.push({ code, name });
+
+    const tbody = document.getElementById('costCentersTableBody');
+    const row = document.createElement('tr');
+    row.innerHTML = `<td>${code}</td><td>${name}</td><td style="color:#4ade80;">${isAr ? 'نشط' : 'Active'}</td>`;
+    tbody.appendChild(row);
+
+    document.getElementById('ccCodeInput').value = '';
+    document.getElementById('ccNameInput').value = '';
+    msg.style.color = '#4ade80';
+    msg.innerText = isAr ? '✔ تم إضافة مركز التكلفة بنجاح!' : '✔ Cost center added successfully!';
+    setTimeout(() => msg.innerText = '', 3000);
+}
+
+const accPart1ToggleLang = toggleLanguage;
+toggleLanguage = function() {
+    accPart1ToggleLang();
+    const isAr = currentLang === 'ar';
+    document.getElementById('accLangBtn').innerText = isAr ? 'English' : 'العربية';
+    document.getElementById('accBackBtn').innerText = isAr ? '→ الرئيسية' : '← Back';
+    document.getElementById('accScreenTitle').innerText = isAr ? '📊 إدارة الحسابات (الأستاذ العام)' : '📊 Accounting Management (GL)';
+    document.getElementById('accTabBtn1').innerText = isAr ? '🌳 الدليل المحاسبي (COA)' : '🌳 Chart of Accounts';
+    document.getElementById('accTabBtn2').innerText = isAr ? '🏢 مراكز التكلفة (Cost Centers)' : '🏢 Cost Centers';
+    document.getElementById('accPTitle1').innerText = isAr ? 'الدليل المحاسبي الشجري (Chart of Accounts)' : 'Chart of Accounts (COA)';
+    document.getElementById('accPTitle2').innerText = isAr ? 'تهيئة مراكز التكلفة (Cost Centers)' : 'Cost Centers Setup';
+    document.getElementById('lblAccCode').innerText = isAr ? 'رقم الحساب (Account No.)' : 'Account Number';
+    document.getElementById('lblAccName').innerText = isAr ? 'اسم الحساب (Account Name)' : 'Account Name';
+    document.getElementById('lblAccGroup').innerText = isAr ? 'المجموعة الرئيسية (Group)' : 'Account Group';
+    document.getElementById('lblAccLevel').innerText = isAr ? 'نوع الحساب (Account Level)' : 'Account Level';
+    document.getElementById('lblAccNature').innerText = isAr ? 'طبيعة الحساب (Nature)' : 'Account Nature';
+    document.getElementById('addAccBtn').innerText = isAr ? '+ حفظ الحساب في الدليل' : '+ Save Account';
+    document.getElementById('lblCcCode').innerText = isAr ? 'رمز المركز (Center Code)' : 'Center Code';
+    document.getElementById('lblCcName').innerText = isAr ? 'اسم مركز التكلفة (Center Name)' : 'Cost Center Name';
+    document.getElementById('addCcBtn').innerText = isAr ? '+ إضافة مركز تكلفة' : '+ Add Cost Center';
+};
+// برمجة الحالات الثلاث للدليل المحاسبي (تلقائي / إكسل / يدوي)
+function renderAccountsTable() {
+    const tbody = document.getElementById('accountsTableBody');
+    tbody.innerHTML = '';
+    chartOfAccounts.forEach(acc => {
+        const row = document.createElement('tr');
+        row.innerHTML = `<td>${acc.code}</td><td>${acc.name}</td><td>${acc.group}</td><td>${acc.level}</td><td>${acc.nature}</td>`;
+        tbody.appendChild(row);
+    });
+}
+
+function generateDefaultCOA() {
+    const standardAccounts = [
+        { code: '1', name: 'الأصول (Assets)', group: 'الأصول (Assets)', level: 'رئيسي (تجميعي)', nature: 'مدين (Debit)' },
+        { code: '11', name: 'الأصول المتداولة (Current Assets)', group: 'الأصول (Assets)', level: 'رئيسي (تجميعي)', nature: 'مدين (Debit)' },
+        { code: '1101', name: 'الصندوق الرئيسي (Main Cash)', group: 'الأصول (Assets)', level: 'تحليلي (يقبل الحركة)', nature: 'مدين (Debit)' },
+        { code: '1102', name: 'البنك (Bank Account)', group: 'الأصول (Assets)', level: 'تحليلي (يقبل الحركة)', nature: 'مدين (Debit)' },
+        { code: '1201', name: 'العملاء (Customers)', group: 'الأصول (Assets)', level: 'تحليلي (يقبل الحركة)', nature: 'مدين (Debit)' },
+        { code: '1301', name: 'المخزون السلعي (Inventory)', group: 'الأصول (Assets)', level: 'تحليلي (يقبل الحركة)', nature: 'مدين (Debit)' },
+        { code: '2', name: 'الخصوم (Liabilities)', group: 'الخصوم (Liabilities)', level: 'رئيسي (تجميعي)', nature: 'دائن (Credit)' },
+        { code: '2101', name: 'الموردون (Suppliers)', group: 'الخصوم (Liabilities)', level: 'تحليلي (يقبل الحركة)', nature: 'دائن (Credit)' },
+        { code: '2201', name: 'ضريبة القيمة المضافة (VAT)', group: 'الخصوم (Liabilities)', level: 'تحليلي (يقبل الحركة)', nature: 'دائن (Credit)' },
+        { code: '3', name: 'حقوق الملكية (Equity)', group: 'حقوق الملكية (Equity)', level: 'رئيسي (تجميعي)', nature: 'دائن (Credit)' },
+        { code: '3101', name: 'رأس المال (Capital)', group: 'حقوق الملكية (Equity)', level: 'تحليلي (يقبل الحركة)', nature: 'دائن (Credit)' },
+        { code: '4', name: 'الإيرادات (Revenue)', group: 'الإيرادات (Revenue)', level: 'رئيسي (تجميعي)', nature: 'دائن (Credit)' },
+        { code: '4101', name: 'إيرادات المبيعات (Sales Revenue)', group: 'الإيرادات (Revenue)', level: 'تحليلي (يقبل الحركة)', nature: 'دائن (Credit)' },
+        { code: '5', name: 'المصروفات (Expenses)', group: 'المصروفات (Expenses)', level: 'رئيسي (تجميعي)', nature: 'مدين (Debit)' },
+        { code: '5101', name: 'تكلفة البضاعة المباعة (COGS)', group: 'المصروفات (Expenses)', level: 'تحليلي (يقبل الحركة)', nature: 'مدين (Debit)' },
+        { code: '5201', name: 'مصروفات الرواتب والأجور (Salaries)', group: 'المصروفات (Expenses)', level: 'تحليلي (يقبل الحركة)', nature: 'مدين (Debit)' },
+        { code: '5202', name: 'مصروفات الإيجار والكهرباء (Rent & Utilities)', group: 'المصروفات (Expenses)', level: 'تحليلي (يقبل الحركة)', nature: 'مدين (Debit)' }
+    ];
+
+    let addedCount = 0;
+    standardAccounts.forEach(item => {
+        if (!chartOfAccounts.some(existing => existing.code === item.code)) {
+            chartOfAccounts.push(item);
+            addedCount++;
+        }
+    });
+
+    chartOfAccounts.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
+    renderAccountsTable();
+
+    const msg = document.getElementById('accAddMsg');
+    msg.style.color = '#4ade80';
+    msg.innerText = currentLang === 'ar' 
+        ? `✔ تم تنزيل الدليل القياسي بنجاح! (تمت إضافة ${addedCount} حساب جديد وترتيب الشجرة)` 
+        : `✔ Standard COA generated! (${addedCount} new accounts added)`;
+    setTimeout(() => msg.innerText = '', 4000);
+}
+
+function downloadExcelTemplate() {
+    const csvContent = "\uFEFFAccountCode,AccountName,Group,Level,Nature\n" +
+        "1103,بنك الراجحي,الأصول (Assets),تحليلي (يقبل الحركة),مدين (Debit)\n" +
+        "5203,مصروفات دعاية وإعلان,المصروفات (Expenses),تحليلي (يقبل الحركة),مدين (Debit)\n";
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "KMA_ChartOfAccounts_Template.csv";
+    link.click();
+}
+
+function importCOAFromCSV() {
+    const fileInput = document.getElementById('coaExcelInput');
+    const msg = document.getElementById('accAddMsg');
+    const isAr = currentLang === 'ar';
+
+    if (!fileInput.files || fileInput.files.length === 0) {
+        msg.style.color = '#f87171';
+        msg.innerText = isAr ? '⚠️ يرجى اختيار ملف الإكسل (CSV) أولاً!' : '⚠️ Please select a CSV file first!';
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const lines = e.target.result.split(/\r?\n/);
+        let imported = 0;
+        let skipped = 0;
+
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+            const cols = line.split(',');
+            if (cols.length >= 5) {
+                const code = cols.trim();
+                const name = cols.trim();
+                const group = cols.trim();
+                const level = cols.trim();
+                const nature = cols.trim();
+
+                if (code && name && !chartOfAccounts.some(a => a.code === code)) {
+                    chartOfAccounts.push({ code, name, group, level, nature });
+                    imported++;
+                } else {
+                    skipped++;
+                }
+            }
+        }
+
+        chartOfAccounts.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
+        renderAccountsTable();
+        fileInput.value = '';
+
+        msg.style.color = '#4ade80';
+        msg.innerText = isAr 
+            ? `✔ اكتمل السحب من الإكسل: تم استيراد (${imported}) حساب، وتجاهل (${skipped}) مكرر/غير مكتمل.` 
+            : `✔ Excel Import Done: (${imported}) imported, (${skipped}) skipped.`;
+        setTimeout(() => msg.innerText = '', 4500);
+    };
+    reader.readAsText(fileInput.files, 'UTF-8');
+}
+
+</script>
+<!-- زر وأيقونة المساعد الذكي العائمة -->
+<style>
+    .ai-chat-btn {
+        position: fixed; bottom: 25px; inset-inline-start: 25px; z-index: 999;
+        width: 58px; height: 58px; border-radius: 50%;
+        background: linear-gradient(135deg, #0ea5e9, #2563eb);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        color: #fff; font-size: 1.6rem; cursor: pointer;
+        box-shadow: 0 10px 25px rgba(14, 165, 233, 0.45);
+        transition: 0.3s;
+    }
+    .ai-chat-btn:hover { transform: scale(1.08); }
+
+    .ai-chat-window {
+        display: none; position: fixed; bottom: 95px; inset-inline-start: 25px; z-index: 999;
+        width: 340px; max-width: 90vw; height: 440px;
+        background: rgba(15, 23, 42, 0.92); backdrop-filter: blur(18px);
+        border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 20px;
+        flex-direction: column; overflow: hidden;
+        box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6);
+    }
+    .ai-chat-header {
+        padding: 14px 18px; background: rgba(255, 255, 255, 0.06);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+        display: flex; justify-content: space-between; align-items: center;
+        font-weight: 700; color: #38bdf8;
+    }
+    .ai-chat-messages {
+        flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;
+        font-size: 0.9rem;
+    }
+    .ai-msg { padding: 10px 14px; border-radius: 14px; max-width: 85%; line-height: 1.5; }
+    .ai-msg.user { background: #0284c7; color: #fff; align-self: flex-start; }
+    .ai-msg.bot { background: rgba(255, 255, 255, 0.1); color: #f8fafc; align-self: flex-end; }
+    .ai-chat-input {
+        display: flex; padding: 10px; border-top: 1px solid rgba(255, 255, 255, 0.12); gap: 8px;
+    }
+    .ai-chat-input input {
+        flex: 1; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.15);
+        background: rgba(255, 255, 255, 0.07); color: #fff; outline: none;
+    }
+    .ai-chat-input button {
+        padding: 0 16px; border-radius: 10px; border: none;
+        background: #0ea5e9; color: #fff; font-weight: 700; cursor: pointer;
+    }
+</style>
+
+<button class="ai-chat-btn" onclick="toggleAiChat()" title="مساعد KMA الذكي">🤖</button>
+
+<div class="ai-chat-window" id="aiChatWindow">
+    <div class="ai-chat-header">
+        <span>مساعد نظام KMA الذكي</span>
+        <span style="cursor:pointer; color:#94a3b8;" onclick="toggleAiChat()">✖</span>
+    </div>
+    <div class="ai-chat-messages" id="aiMessages">
+        <div class="ai-msg bot">مرحباً بك في نظام KMA! كيف يمكنني مساعدتك اليوم؟</div>
+    </div>
+    <div class="ai-chat-input">
+        <input type="text" id="aiUserInput" placeholder="اكتب سؤالك هنا..." onkeypress="if(event.key==='Enter') sendToChatGPT()">
+        <button onclick="sendToChatGPT()">إرسال</button>
+    </div>
+</div>
+
+<!-- بداية واجهة مساعد KMA الذكي -->
+<style>
+    .ai-chat-btn {
+        position: fixed; bottom: 25px; inset-inline-start: 25px; z-index: 999;
+        width: 58px; height: 58px; border-radius: 50%;
+        background: linear-gradient(135deg, #0ea5e9, #2563eb);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        color: #fff; font-size: 1.6rem; cursor: pointer;
+        box-shadow: 0 10px 25px rgba(14, 165, 233, 0.45);
+        transition: 0.3s;
+    }
+    .ai-chat-btn:hover { transform: scale(1.08); }
+
+    .ai-chat-window {
+        display: none; position: fixed; bottom: 95px; inset-inline-start: 25px; z-index: 999;
+        width: 340px; max-width: 90vw; height: 440px;
+        background: rgba(15, 23, 42, 0.92); backdrop-filter: blur(18px);
+        border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 20px;
+        flex-direction: column; overflow: hidden;
+        box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6);
+    }
+    .ai-chat-header {
+        padding: 14px 18px; background: rgba(255, 255, 255, 0.06);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+        display: flex; justify-content: space-between; align-items: center;
+        font-weight: 700; color: #38bdf8;
+    }
+    .ai-chat-messages {
+        flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;
+        font-size: 0.9rem;
+    }
+    .ai-msg { padding: 10px 14px; border-radius: 14px; max-width: 85%; line-height: 1.5; }
+    .ai-msg.user { background: #0284c7; color: #fff; align-self: flex-start; }
+    .ai-msg.bot { background: rgba(255, 255, 255, 0.1); color: #f8fafc; align-self: flex-end; }
+    .ai-chat-input {
+        display: flex; padding: 10px; border-top: 1px solid rgba(255, 255, 255, 0.12); gap: 8px;
+    }
+    .ai-chat-input input {
+        flex: 1; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.15);
+        background: rgba(255, 255, 255, 0.07); color: #fff; outline: none;
+    }
+    .ai-chat-input button {
+        padding: 0 16px; border-radius: 10px; border: none;
+        background: #0ea5e9; color: #fff; font-weight: 700; cursor: pointer;
+    }
+</style>
+
+<button class="ai-chat-btn" onclick="toggleAiChat()" title="مساعد KMA الذكي">🤖</button>
+
+<div class="ai-chat-window" id="aiChatWindow">
+    <div class="ai-chat-header">
+        <span>مساعد نظام KMA الذكي</span>
+        <span style="cursor:pointer; color:#94a3b8;" onclick="toggleAiChat()">✖</span>
+    </div>
+    <div class="ai-chat-messages" id="aiMessages">
+        <div class="ai-msg bot">مرحباً بك في نظام KMA! كيف يمكنني مساعدتك اليوم؟</div>
+    </div>
+    <div class="ai-chat-input">
+        <input type="text" id="aiUserInput" placeholder="اكتب سؤالك هنا..." onkeypress="if(event.key==='Enter') sendToChatGPT()">
+        <button onclick="sendToChatGPT()">إرسال</button>
+    </div>
+</div>
+
+<script>
+    function toggleAiChat() {
+        const win = document.getElementById('aiChatWindow');
+        win.style.display = win.style.display === 'flex' ? 'none' : 'flex';
+    }
+
+    async function sendToChatGPT() {
+        const input = document.getElementById('aiUserInput');
+        const messagesBox = document.getElementById('aiMessages');
+        const userText = input.value.trim();
+        if (!userText) return;
+
+        messagesBox.innerHTML += `<div class="ai-msg user">${userText}</div>`;
+        input.value = '';
+        messagesBox.scrollTop = messagesBox.scrollHeight;
+
+        const loadingId = 'loading-' + Date.now();
+        messagesBox.innerHTML += `<div class="ai-msg bot" id="${loadingId}">جاري التفكير...</div>`;
+
+        try {
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: userText })
+            });
+
+            const data = await response.json();
+            document.getElementById(loadingId).innerText = data.reply || 'لم يصل رد من المساعد.';
+        } catch (error) {
+            document.getElementById(loadingId).innerText = 'حدث خطأ في الاتصال بالسحابة.';
+        }
+        messagesBox.scrollTop = messagesBox.scrollHeight;
+    }
+</script>
+<!-- نهاية واجهة مساعد KMA الذكي -->
+
+</body>
+</html>
