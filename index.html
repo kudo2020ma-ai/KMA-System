@@ -1,0 +1,1056 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="data:," />
+    <title>نظام KMA</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f4f2ec;
+        --surface: #ffffff;
+        --surface-alt: #eceae2;
+        --text: #1c2733;
+        --dim: #5d6b7a;
+        --border: #d8d4c8;
+        --accent: #0e7c7b;
+        --accent-ink: #ffffff;
+        --navy: #0f2a4a;
+        --gold: #c9a227;
+        --danger: #b3372f;
+        --radius: 10px;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #10151c;
+          --surface: #1a2230;
+          --surface-alt: #232e40;
+          --text: #eef2f6;
+          --dim: #9fb0c1;
+          --border: #3a4a61;
+          --accent: #2bb3a3;
+          --navy: #0a1c33;
+          --gold: #d4af37;
+          --danger: #e0655c;
+        }
+      }
+      * { box-sizing: border-box; }
+      html { font-family: Tahoma, "Segoe UI", "Noto Kufi Arabic", system-ui, sans-serif; }
+      body { margin: 0; background: var(--bg); color: var(--text); }
+      button, [role="button"], select, summary, input:not([type="checkbox"], [type="radio"]) { min-height: 2.25rem; }
+      button { font-family: inherit; cursor: pointer; }
+      input, select { font-family: inherit; }
+      .hidden { display: none !important; }
+
+      /* ---------- login ---------- */
+      .login-wrap {
+        min-height: 100vh; min-height: 100dvh;
+        display: flex; align-items: center; justify-content: center;
+        padding: 2.5rem 1rem;
+        background:
+          radial-gradient(circle at 20% 15%, #1b4066 0, transparent 45%),
+          radial-gradient(circle at 85% 90%, rgba(14,124,123,.35) 0, transparent 40%),
+          var(--navy);
+      }
+      .login-card {
+        width: 100%; max-width: 24rem;
+        background: var(--surface); border-radius: 16px;
+        padding: 1.5rem; box-shadow: 0 24px 60px rgba(0,0,0,.45);
+      }
+      .login-logo {
+        width: 4rem; height: 4rem; margin: 0 auto;
+        display: flex; align-items: center; justify-content: center;
+        background: var(--navy); color: var(--gold);
+        border-radius: 12px; font-size: 1.25rem; font-weight: 900; letter-spacing: .05em;
+      }
+      .login-card h1 { margin: .75rem 0 0; text-align: center; font-size: 1.5rem; font-weight: 900; color: var(--navy); }
+      @media (prefers-color-scheme: dark) { .login-card h1 { color: var(--text); } }
+      .login-sub { margin: .25rem 0 1.25rem; text-align: center; font-size: .875rem; color: var(--dim); }
+
+      /* ---------- forms ---------- */
+      .field label { display: block; margin-bottom: .25rem; font-size: .875rem; font-weight: 600; }
+      .inp {
+        width: 100%; border: 1px solid var(--border); border-radius: var(--radius);
+        background: var(--surface); color: var(--text);
+        padding: .5rem .75rem; font-size: 1rem; outline: none;
+      }
+      .inp:focus { border-color: var(--accent); }
+      .form-grid { display: grid; grid-template-columns: 1fr; gap: .75rem; }
+      @media (min-width: 640px) {
+        .cols-3 { grid-template-columns: repeat(3, 1fr); }
+        .cols-4 { grid-template-columns: repeat(4, 1fr); }
+        .cols-6 { grid-template-columns: repeat(3, 1fr); }
+      }
+      @media (min-width: 1024px) { .cols-6 { grid-template-columns: repeat(6, 1fr); } }
+      .cols-2m { grid-template-columns: repeat(2, 1fr); }
+      @media (min-width: 1024px) { .cols-2m { grid-template-columns: repeat(4, 1fr); } }
+      .btn-primary {
+        background: var(--accent); color: var(--accent-ink); border: none;
+        border-radius: var(--radius); padding: .5rem 1.25rem; font-weight: 700; font-size: 1rem;
+      }
+      .btn-primary:disabled { opacity: .5; }
+      .btn-outline {
+        background: transparent; border: 1px solid var(--accent); color: var(--accent);
+        border-radius: var(--radius); padding: .25rem .75rem; font-weight: 600; font-size: .875rem;
+      }
+      .btn-ghost {
+        background: transparent; border: 1px solid var(--border); color: var(--text);
+        border-radius: var(--radius); padding: .5rem 1rem; font-weight: 600;
+      }
+      .btn-danger-outline {
+        background: transparent; border: 1px solid var(--danger); color: var(--danger);
+        border-radius: var(--radius); padding: .25rem .75rem; font-weight: 600; font-size: .875rem;
+      }
+      .btn-danger {
+        background: var(--danger); color: #fff; border: none;
+        border-radius: var(--radius); padding: .25rem .75rem; font-weight: 700; font-size: .875rem;
+      }
+      .form-error { margin-top: .5rem; font-size: .875rem; font-weight: 600; color: var(--danger); }
+      .empty-note { padding: .75rem 0; text-align: center; font-size: .875rem; color: var(--dim); }
+      .saved-note { font-weight: 600; color: var(--accent); font-size: .875rem; }
+
+      /* ---------- shell ---------- */
+      header.topbar {
+        position: sticky; top: 0; z-index: 10;
+        background: var(--navy); color: #fff;
+        box-shadow: 0 2px 8px rgba(0,0,0,.25);
+        padding-top: env(safe-area-inset-top);
+      }
+      .topbar-in {
+        max-width: 72rem; margin: 0 auto; padding: .75rem 1rem;
+        display: flex; align-items: center; justify-content: space-between; gap: .75rem;
+      }
+      .brand { display: flex; align-items: center; gap: .75rem; min-width: 0; }
+      .brand-badge {
+        width: 2.5rem; height: 2.5rem; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center;
+        background: var(--gold); color: var(--navy);
+        border-radius: 8px; font-size: .875rem; font-weight: 900;
+      }
+      .brand-name { font-weight: 900; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .brand-sub { font-size: .75rem; color: rgba(255,255,255,.7); }
+      .top-actions { display: flex; align-items: center; gap: .5rem; flex-shrink: 0; }
+      .btn-home {
+        background: rgba(255,255,255,.15); color: #fff; border: none;
+        border-radius: var(--radius); padding: .5rem 1rem; font-weight: 700; font-size: .875rem;
+      }
+      .btn-logout {
+        background: var(--danger); color: #fff; border: none;
+        border-radius: var(--radius); padding: .5rem 1rem; font-weight: 700; font-size: .875rem;
+      }
+      .user-chip { font-size: .875rem; color: rgba(255,255,255,.8); }
+      @media (max-width: 639px) { .user-chip { display: none; } }
+      main.page { max-width: 72rem; margin: 0 auto; padding: 1.25rem 1rem 2.5rem; }
+      .stack > * + * { margin-top: 1.25rem; }
+
+      /* ---------- cards & lists ---------- */
+      .card {
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: var(--radius); padding: 1rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,.06);
+      }
+      .card h2 {
+        margin: 0 0 .75rem; padding-bottom: .5rem;
+        border-bottom: 2px solid var(--gold);
+        font-size: 1.125rem; font-weight: 700; color: var(--navy);
+      }
+      @media (prefers-color-scheme: dark) { .card h2 { color: var(--text); } }
+      .stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: .75rem; }
+      @media (min-width: 1024px) { .stat-grid { grid-template-columns: repeat(4, 1fr); } }
+      .stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: .75rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+      .stat .lbl { font-size: .75rem; font-weight: 600; color: var(--dim); }
+      .stat .val { margin-top: .25rem; font-size: 1.125rem; font-weight: 900; color: var(--navy); }
+      @media (prefers-color-scheme: dark) { .stat .val { color: var(--text); } }
+      .stat .val .cur { margin-right: .25rem; font-size: .75rem; font-weight: 600; color: var(--dim); }
+      .rows { list-style: none; margin: 0; padding: 0; }
+      .rows > li { padding: .5rem 0; font-size: .875rem; }
+      .rows.divided > li + li { border-top: 1px solid var(--border); }
+      .row-between { display: flex; align-items: center; justify-content: space-between; gap: .5rem; flex-wrap: wrap; }
+      .tag {
+        display: inline-block; margin-right: .5rem; padding: .1rem .5rem;
+        background: var(--surface-alt); border-radius: 6px; font-size: .75rem;
+      }
+      .tag-kind { color: #fff; font-weight: 700; }
+      .tag-sale { background: var(--accent); }
+      .tag-purchase { background: var(--navy); }
+      .qty-badge { padding: .25rem .5rem; border-radius: 6px; font-weight: 900; background: var(--surface-alt); }
+      .qty-badge.low { background: var(--danger); color: #fff; }
+      .balance-badge { padding: .25rem .5rem; border-radius: 6px; font-weight: 900; background: var(--surface-alt); }
+      .balance-badge.owed { background: var(--gold); color: var(--navy); }
+      .muted { color: var(--dim); font-size: .75rem; }
+      .strong { font-weight: 700; }
+      .black { font-weight: 900; }
+
+      /* ---------- departments ---------- */
+      .dept-grid { display: grid; grid-template-columns: 1fr; gap: .75rem; }
+      @media (min-width: 640px) { .dept-grid { grid-template-columns: repeat(2, 1fr); } }
+      @media (min-width: 1024px) { .dept-grid { grid-template-columns: repeat(3, 1fr); } }
+      .dept-btn {
+        display: flex; align-items: center; gap: 1rem; text-align: right;
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: var(--radius); padding: 1.25rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,.06); color: var(--text);
+      }
+      .dept-btn:hover { border-color: var(--accent); }
+      .dept-icon {
+        width: 3.5rem; height: 3.5rem; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center;
+        background: var(--navy); color: var(--gold); border-radius: 12px;
+      }
+      .dept-title { display: block; font-size: 1.125rem; font-weight: 900; color: var(--navy); }
+      @media (prefers-color-scheme: dark) { .dept-title { color: var(--text); } }
+      .dept-sub { display: block; margin-top: .15rem; font-size: .875rem; color: var(--dim); }
+
+      /* ---------- invoice lines ---------- */
+      .line-row {
+        display: grid; grid-template-columns: repeat(2, 1fr); gap: .5rem; align-items: end;
+        background: var(--surface-alt); border-radius: var(--radius); padding: .5rem; margin-top: .5rem;
+      }
+      @media (min-width: 1024px) { .line-row { grid-template-columns: repeat(5, 1fr); } }
+      .pay-toggle { display: flex; gap: .5rem; }
+      .pay-toggle button {
+        flex: 1; border: 1px solid var(--border); background: var(--surface); color: var(--text);
+        border-radius: var(--radius); padding: .5rem .75rem; font-weight: 700;
+      }
+      .pay-toggle button.on { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+      .invoice-box { border: 1px solid var(--border); border-radius: var(--radius); padding: .75rem; font-size: .875rem; }
+      .invoice-box + .invoice-box { margin-top: .75rem; }
+      .invoice-lines { list-style: none; margin: .5rem 0 0; padding: .5rem 0 0; border-top: 1px solid var(--border); font-size: .75rem; color: var(--dim); }
+      .invoice-lines li { display: flex; justify-content: space-between; padding: .15rem 0; }
+      .lowstock-row {
+        display: flex; align-items: center; justify-content: space-between;
+        background: var(--surface-alt); border-radius: var(--radius);
+        padding: .5rem .75rem; font-size: .875rem; margin-top: .5rem;
+      }
+      .lowstock-row .n { font-weight: 900; color: var(--danger); }
+      .pay-form { display: flex; align-items: center; gap: .5rem; margin-top: .5rem; flex-wrap: wrap; }
+      .pay-form .inp { max-width: 10rem; }
+      .align-end { display: flex; align-items: flex-end; gap: .5rem; flex-wrap: wrap; }
+    </style>
+  </head>
+  <body>
+    <!-- ======== شاشة الدخول ======== -->
+    <div id="loginView" class="login-wrap">
+      <form id="loginForm" class="login-card" autocomplete="off">
+        <div class="login-logo">KMA</div>
+        <h1>نظام KMA</h1>
+        <p class="login-sub">نظام إدارة الحسابات والمخزون والمبيعات</p>
+        <div class="stack" style="--x:0">
+          <div class="field">
+            <label for="loginUser">اسم المستخدم</label>
+            <input id="loginUser" class="inp" type="text" value="1" dir="ltr" style="text-align:right" autocomplete="username" />
+          </div>
+          <div class="field" style="margin-top:.75rem">
+            <label for="loginPass">كلمة المرور</label>
+            <input id="loginPass" class="inp" type="password" value="1" dir="ltr" style="text-align:right" autocomplete="current-password" />
+          </div>
+        </div>
+        <p id="loginError" class="form-error" role="alert"></p>
+        <button type="submit" class="btn-primary" style="width:100%; margin-top:1.25rem; padding:.75rem; font-size:1.125rem">دخول</button>
+        <p class="muted" style="text-align:center; margin-top:.75rem">Enter في اسم المستخدم ينقلك إلى كلمة المرور، وEnter فيها يدخلك للنظام</p>
+      </form>
+    </div>
+
+    <!-- ======== التطبيق ======== -->
+    <div id="appView" class="hidden">
+      <header class="topbar">
+        <div class="topbar-in">
+          <div class="brand">
+            <span class="brand-badge">KMA</span>
+            <span>
+              <span class="brand-name" id="brandCompany">KMA</span>
+              <span class="brand-sub" id="brandSection" style="display:block">القائمة الرئيسية</span>
+            </span>
+          </div>
+          <div class="top-actions">
+            <button type="button" id="btnHome" class="btn-home hidden">القائمة الرئيسية</button>
+            <span class="user-chip">المستخدم: <span id="userChip">1</span></span>
+            <button type="button" id="btnLogout" class="btn-logout">خروج</button>
+          </div>
+        </div>
+      </header>
+      <main class="page">
+        <div id="viewHome" class="stack"></div>
+        <div id="viewDept" class="stack hidden"></div>
+      </main>
+    </div>
+
+    <script>
+    "use strict";
+    // ================= الحالة (تعمل داخل الجلسة) =================
+    var state = {
+      user: null,
+      dept: "home",
+      settings: { companyName: "KMA", currency: "ر.س" },
+      users: [ { id: 1, username: "1", password: "1", role: "admin" } ],
+      accounts: [],   // {id,name,type,balance} balance بالهللات
+      journal: [],    // {id,date,description,accountId,accountName,debit,credit}
+      items: [],      // {id,name,code,unit,qty,minQty,costPrice,salePrice}
+      moves: [],      // {id,itemId,itemName,kind,qty,note,date}
+      partners: [],   // {id,kind,name,phone,address,balance}
+      invoices: [],   // {id,kind,number,partnerId,partnerName,date,payType,total,lines:[{itemId,itemName,qty,price,total}]}
+      seq: { user: 2, account: 1, journal: 1, item: 1, move: 1, partner: 1, invoice: 1, purchase: 1, sale: 1 }
+    };
+
+    // ================= أدوات =================
+    function $(id) { return document.getElementById(id); }
+    function esc(s) {
+      return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+        return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+      });
+    }
+    function today() {
+      var d = new Date();
+      return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+    }
+    function fmtMoney(minor) {
+      return (minor / 100).toLocaleString("ar-u-nu-latn", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function fmtQty(n) { return Number(n).toLocaleString("ar-u-nu-latn", { maximumFractionDigits: 3 }); }
+    function parseMoney(s) {
+      var v = parseFloat(String(s).replace(/,/g, ""));
+      if (!isFinite(v)) return NaN;
+      return Math.round(v * 100);
+    }
+    function cur() { return state.settings.currency; }
+    function byId(list, id) { for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i]; return null; }
+
+    var ICONS = {
+      system: '<line x1="4" y1="7" x2="20" y2="7"/><circle cx="9" cy="7" r="2.2" fill="currentColor" stroke="none"/><line x1="4" y1="12" x2="20" y2="12"/><circle cx="15" cy="12" r="2.2" fill="currentColor" stroke="none"/><line x1="4" y1="17" x2="20" y2="17"/><circle cx="7" cy="17" r="2.2" fill="currentColor" stroke="none"/>',
+      accounts: '<rect x="4" y="3" width="16" height="18" rx="2"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="13" y2="12"/><line x1="8" y1="16" x2="13" y2="16"/>',
+      inventory: '<path d="M3 8l9-4.5L21 8v8l-9 4.5L3 16z"/><path d="M3 8l9 4.5L21 8"/><path d="M12 12.5V20"/>',
+      purchases: '<path d="M2.5 6h3l2.2 11h10.6l2-8H6"/><circle cx="9.5" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/><path d="M12 3v5M9.8 5.8L12 8l2.2-2.2"/>',
+      sales: '<path d="M2.5 6h3l2.2 11h10.6l2-8H6"/><circle cx="9.5" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/><path d="M12 8V3M9.8 5.2L12 3l2.2 2.2"/>',
+      reports: '<line x1="4" y1="20" x2="20" y2="20"/><line x1="7" y1="20" x2="7" y2="13"/><line x1="12" y1="20" x2="12" y2="8"/><line x1="17" y1="20" x2="17" y2="11"/>'
+    };
+    function icon(name) {
+      return '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICONS[name] + "</svg>";
+    }
+
+    var DEPTS = [
+      { key: "system", title: "إدارة النظام", sub: "المستخدمون والإعدادات العامة" },
+      { key: "accounts", title: "الحسابات", sub: "دليل الحسابات والقيود اليومية" },
+      { key: "inventory", title: "المخزون والجرد", sub: "الأصناف وحركة المخزون والجرد" },
+      { key: "purchases", title: "المشتريات والموردون", sub: "فواتير الشراء والموردون والدفعات" },
+      { key: "sales", title: "المبيعات والعملاء", sub: "فواتير البيع والعملاء والتحصيل" },
+      { key: "reports", title: "التقارير", sub: "المبيعات والمشتريات والأرباح والأرصدة" }
+    ];
+    var DEPT_TITLES = {};
+    DEPTS.forEach(function (d) { DEPT_TITLES[d.key] = d.title; });
+    var ACCOUNT_TYPES = { asset: "أصول", liability: "خصوم", equity: "حقوق ملكية", income: "إيرادات", expense: "مصروفات" };
+
+    // ================= حسابات مشتقة =================
+    function totals() {
+      var t = { sales: 0, purchases: 0, salesCount: 0, purchasesCount: 0, stockCost: 0, stockSale: 0, profit: 0, accountsBalance: 0, customersOwed: 0, suppliersOwed: 0, debit: 0, credit: 0 };
+      state.invoices.forEach(function (v) {
+        if (v.kind === "sale") {
+          t.sales += v.total; t.salesCount++;
+          v.lines.forEach(function (l) {
+            var it = byId(state.items, l.itemId);
+            t.profit += l.total - Math.round(l.qty * (it ? it.costPrice : 0));
+          });
+        } else { t.purchases += v.total; t.purchasesCount++; }
+      });
+      state.items.forEach(function (i) { t.stockCost += Math.round(i.qty * i.costPrice); t.stockSale += Math.round(i.qty * i.salePrice); });
+      state.accounts.forEach(function (a) { t.accountsBalance += a.balance; });
+      state.partners.forEach(function (p) {
+        if (p.kind === "customer") t.customersOwed += p.balance; else t.suppliersOwed += p.balance;
+      });
+      state.journal.forEach(function (e) { t.debit += e.debit; t.credit += e.credit; });
+      return t;
+    }
+    function statCard(label, value, withCur) {
+      return '<div class="stat"><p class="lbl" style="margin:0">' + esc(label) + '</p><p class="val" style="margin:.25rem 0 0">' +
+        esc(value) + (withCur ? '<span class="cur">' + esc(cur()) + "</span>" : "") + "</p></div>";
+    }
+    function sectionCard(title, inner) {
+      return '<section class="card"><h2>' + esc(title) + "</h2>" + inner + "</section>";
+    }
+    function emptyNote(text) { return '<p class="empty-note">' + esc(text) + "</p>"; }
+
+    // زر حذف بتأكيد من خطوتين
+    var armedDelete = null;
+    function dangerBtn(action, id, label) {
+      var key = action + ":" + id;
+      if (armedDelete === key) {
+        return '<button type="button" class="btn-danger" data-act="' + action + '" data-id="' + id + '">تأكيد الحذف</button>';
+      }
+      return '<button type="button" class="btn-danger-outline" data-arm="' + key + '">' + esc(label || "حذف") + "</button>";
+    }
+
+    // ================= التنقل =================
+    function go(dept) {
+      state.dept = dept;
+      armedDelete = null;
+      render();
+      window.scrollTo(0, 0);
+    }
+    function render() {
+      $("brandCompany").textContent = state.settings.companyName || "KMA";
+      $("brandSection").textContent = state.dept === "home" ? "القائمة الرئيسية" : DEPT_TITLES[state.dept];
+      $("btnHome").classList.toggle("hidden", state.dept === "home");
+      if (state.dept === "home") {
+        $("viewHome").classList.remove("hidden");
+        $("viewDept").classList.add("hidden");
+        renderHome();
+      } else {
+        $("viewHome").classList.add("hidden");
+        $("viewDept").classList.remove("hidden");
+        var v = $("viewDept");
+        if (state.dept === "system") renderSystem(v);
+        else if (state.dept === "accounts") renderAccounts(v);
+        else if (state.dept === "inventory") renderInventory(v);
+        else if (state.dept === "purchases") renderTrade(v, "purchase");
+        else if (state.dept === "sales") renderTrade(v, "sale");
+        else if (state.dept === "reports") renderReports(v);
+      }
+    }
+
+    // ================= الرئيسية =================
+    function renderHome() {
+      var t = totals();
+      var html = '<div class="stat-grid">' +
+        statCard("قيمة المخزون (بالتكلفة)", fmtMoney(t.stockCost), true) +
+        statCard("إجمالي المبيعات", fmtMoney(t.sales), true) +
+        statCard("إجمالي المشتريات", fmtMoney(t.purchases), true) +
+        statCard("أرصدة الحسابات", fmtMoney(t.accountsBalance), true) +
+        "</div>";
+      html += '<div class="dept-grid">';
+      DEPTS.forEach(function (d) {
+        html += '<button type="button" class="dept-btn" data-go="' + d.key + '">' +
+          '<span class="dept-icon">' + icon(d.key) + "</span>" +
+          '<span><span class="dept-title">' + esc(d.title) + '</span><span class="dept-sub">' + esc(d.sub) + "</span></span></button>";
+      });
+      html += "</div>";
+
+      var low = state.items.filter(function (i) { return i.qty <= i.minQty; });
+      if (low.length) {
+        var rows = low.map(function (i) {
+          return '<div class="lowstock-row"><span class="strong">' + esc(i.name) + '</span><span class="n">المتبقي ' +
+            fmtQty(i.qty) + " " + esc(i.unit) + " (الحد الأدنى " + fmtQty(i.minQty) + ")</span></div>";
+        }).join("");
+        html += sectionCard("تنبيه: أصناف وصلت للحد الأدنى", rows);
+      }
+
+      var recent = state.invoices.slice(-8).reverse();
+      var recentHtml;
+      if (!recent.length) {
+        recentHtml = emptyNote("لا توجد فواتير بعد — ابدأ من إدارة المشتريات أو المبيعات");
+      } else {
+        recentHtml = '<ul class="rows divided">' + recent.map(function (v) {
+          return '<li class="row-between"><span><span class="tag tag-kind ' + (v.kind === "sale" ? "tag-sale" : "tag-purchase") + '">' +
+            (v.kind === "sale" ? "بيع" : "شراء") + '</span><span class="strong">فاتورة رقم ' + v.number + "</span>" +
+            (v.partnerName ? '<span style="color:var(--dim)"> — ' + esc(v.partnerName) + "</span>" : "") +
+            '</span><span style="text-align:left"><span class="black" style="display:block">' + fmtMoney(v.total) + " " + esc(cur()) +
+            '</span><span class="muted">' + esc(v.date) + "</span></span></li>";
+        }).join("") + "</ul>";
+      }
+      html += sectionCard("أحدث الفواتير", recentHtml);
+      $("viewHome").innerHTML = html;
+    }
+
+    // ================= إدارة النظام =================
+    var sysForm = { username: "", password: "", role: "user", error: "", company: null, currency: null, settingsError: "", saved: false };
+    function renderSystem(v) {
+      var company = sysForm.company != null ? sysForm.company : state.settings.companyName;
+      var currency = sysForm.currency != null ? sysForm.currency : state.settings.currency;
+      var usersHtml = state.users.length
+        ? '<ul class="rows divided" style="margin-top:.75rem">' + state.users.map(function (u) {
+            return '<li class="row-between"><span><span class="black">' + esc(u.username) + '</span><span class="tag">' +
+              (u.role === "admin" ? "مدير النظام" : "مستخدم") + "</span>" +
+              (state.user && state.user.username === u.username ? '<span style="color:var(--accent); font-size:.75rem">(أنت الآن)</span>' : "") +
+              "</span>" + (u.username !== "1" ? dangerBtn("del-user", u.id) : "") + "</li>";
+          }).join("") + "</ul>"
+        : emptyNote("لا يوجد مستخدمون");
+
+      var form =
+        '<form id="userForm" class="form-grid cols-4">' +
+        '<div class="field"><label for="nu-name">اسم المستخدم</label><input id="nu-name" class="inp" value="' + esc(sysForm.username) + '"></div>' +
+        '<div class="field"><label for="nu-pass">كلمة المرور</label><input id="nu-pass" class="inp" value="' + esc(sysForm.password) + '"></div>' +
+        '<div class="field"><label for="nu-role">الصلاحية</label><select id="nu-role" class="inp">' +
+        '<option value="user"' + (sysForm.role === "user" ? " selected" : "") + '>مستخدم</option>' +
+        '<option value="admin"' + (sysForm.role === "admin" ? " selected" : "") + '>مدير النظام</option></select></div>' +
+        '<div class="align-end"><button type="submit" class="btn-primary">إضافة مستخدم</button></div></form>' +
+        (sysForm.error ? '<p class="form-error" role="alert">' + esc(sysForm.error) + "</p>" : "") + usersHtml;
+
+      var settingsForm =
+        '<form id="settingsForm" class="form-grid cols-3">' +
+        '<div class="field"><label for="set-company">اسم الشركة / المنشأة</label><input id="set-company" class="inp" value="' + esc(company) + '"></div>' +
+        '<div class="field"><label for="set-currency">العملة</label><input id="set-currency" class="inp" value="' + esc(currency) + '"></div>' +
+        '<div class="align-end"><button type="submit" class="btn-primary">حفظ الإعدادات</button>' +
+        (sysForm.saved ? '<span class="saved-note">تم الحفظ ✓</span>' : "") + "</div></form>" +
+        (sysForm.settingsError ? '<p class="form-error" role="alert">' + esc(sysForm.settingsError) + "</p>" : "");
+
+      v.innerHTML = sectionCard("المستخدمون", form) + sectionCard("الإعدادات العامة", settingsForm);
+
+      $("userForm").addEventListener("submit", function (ev) {
+        ev.preventDefault();
+        sysForm.username = $("nu-name").value; sysForm.password = $("nu-pass").value; sysForm.role = $("nu-role").value;
+        if (!sysForm.username.trim()) { sysForm.error = "أدخل اسم المستخدم"; return render(); }
+        if (!sysForm.password) { sysForm.error = "أدخل كلمة المرور"; return render(); }
+        if (state.users.some(function (u) { return u.username === sysForm.username.trim(); })) { sysForm.error = "اسم المستخدم موجود مسبقاً"; return render(); }
+        state.users.push({ id: state.seq.user++, username: sysForm.username.trim(), password: sysForm.password, role: sysForm.role });
+        sysForm.username = ""; sysForm.password = ""; sysForm.role = "user"; sysForm.error = "";
+        render();
+      });
+      $("settingsForm").addEventListener("submit", function (ev) {
+        ev.preventDefault();
+        sysForm.company = $("set-company").value; sysForm.currency = $("set-currency").value;
+        if (!sysForm.company.trim()) { sysForm.settingsError = "أدخل اسم الشركة"; sysForm.saved = false; return render(); }
+        if (!sysForm.currency.trim()) { sysForm.settingsError = "أدخل العملة"; sysForm.saved = false; return render(); }
+        state.settings.companyName = sysForm.company.trim();
+        state.settings.currency = sysForm.currency.trim();
+        sysForm.company = null; sysForm.currency = null; sysForm.settingsError = ""; sysForm.saved = true;
+        render();
+      });
+      ["set-company", "set-currency"].forEach(function (id) {
+        var el = $(id);
+        el.addEventListener("input", function () {
+          if (id === "set-company") sysForm.company = el.value; else sysForm.currency = el.value;
+          sysForm.saved = false;
+        });
+      });
+    }
+
+    // ================= الحسابات =================
+    var accForm = { name: "", type: "asset", balance: "", error: "", jDate: null, jDesc: "", jAccountId: 0, jDebit: "", jCredit: "", jError: "" };
+    function renderAccounts(v) {
+      var c = cur();
+      var typeOptions = Object.keys(ACCOUNT_TYPES).map(function (k) {
+        return '<option value="' + k + '"' + (accForm.type === k ? " selected" : "") + ">" + ACCOUNT_TYPES[k] + "</option>";
+      }).join("");
+      var accOptions = state.accounts.map(function (a) {
+        return '<option value="' + a.id + '"' + (accForm.jAccountId === a.id ? " selected" : "") + ">" + esc(a.name) + "</option>";
+      }).join("");
+
+      var form =
+        '<form id="accForm" class="form-grid cols-4">' +
+        '<div class="field"><label for="ac-name">اسم الحساب</label><input id="ac-name" class="inp" placeholder="مثال: الصندوق" value="' + esc(accForm.name) + '"></div>' +
+        '<div class="field"><label for="ac-type">نوع الحساب</label><select id="ac-type" class="inp">' + typeOptions + "</select></div>" +
+        '<div class="field"><label for="ac-bal">الرصيد الافتتاحي (' + esc(c) + ')</label><input id="ac-bal" class="inp" inputmode="decimal" placeholder="0.00" value="' + esc(accForm.balance) + '"></div>' +
+        '<div class="align-end"><button type="submit" class="btn-primary">إضافة حساب</button></div></form>' +
+        (accForm.error ? '<p class="form-error" role="alert">' + esc(accForm.error) + "</p>" : "");
+
+      var list = state.accounts.length
+        ? '<ul class="rows divided" style="margin-top:.75rem">' + state.accounts.map(function (a) {
+            return '<li class="row-between"><span><span class="black">' + esc(a.name) + '</span><span class="tag">' + esc(ACCOUNT_TYPES[a.type] || a.type) + '</span></span>' +
+              '<span style="display:flex; align-items:center; gap:.75rem"><span class="black">' + fmtMoney(a.balance) + " " + esc(c) + "</span>" + dangerBtn("del-account", a.id) + "</span></li>";
+          }).join("") + "</ul>"
+        : emptyNote("لا توجد حسابات بعد — أضف أول حساب مثل «الصندوق» أو «البنك»");
+
+      var jForm =
+        '<form id="journalForm" class="form-grid cols-6">' +
+        '<div class="field"><label for="j-date">التاريخ</label><input id="j-date" type="date" class="inp" value="' + esc(accForm.jDate || today()) + '"></div>' +
+        '<div class="field"><label for="j-desc">البيان</label><input id="j-desc" class="inp" value="' + esc(accForm.jDesc) + '"></div>' +
+        '<div class="field"><label for="j-acc">الحساب</label><select id="j-acc" class="inp">' + accOptions + "</select></div>" +
+        '<div class="field"><label for="j-debit">مدين (' + esc(c) + ')</label><input id="j-debit" class="inp" inputmode="decimal" placeholder="0.00" value="' + esc(accForm.jDebit) + '"></div>' +
+        '<div class="field"><label for="j-credit">دائن (' + esc(c) + ')</label><input id="j-credit" class="inp" inputmode="decimal" placeholder="0.00" value="' + esc(accForm.jCredit) + '"></div>' +
+        '<div class="align-end"><button type="submit" class="btn-primary">ترحيل القيد</button></div></form>' +
+        (accForm.jError ? '<p class="form-error" role="alert">' + esc(accForm.jError) + "</p>" : "");
+
+      var jList = state.journal.length
+        ? '<ul class="rows divided" style="margin-top:.75rem">' + state.journal.slice().reverse().slice(0, 100).map(function (en) {
+            return '<li class="row-between"><span><span class="strong">' + esc(en.description) + '</span><span class="muted" style="display:block">' + esc(en.accountName) + " — " + esc(en.date) + '</span></span>' +
+              '<span style="display:flex; align-items:center; gap:.75rem; text-align:left"><span>' +
+              (en.debit > 0 ? '<span class="strong" style="display:block">مدين ' + fmtMoney(en.debit) + "</span>" : "") +
+              (en.credit > 0 ? '<span class="strong" style="display:block">دائن ' + fmtMoney(en.credit) + "</span>" : "") +
+              "</span>" + dangerBtn("del-entry", en.id) + "</span></li>";
+          }).join("") + "</ul>"
+        : emptyNote("لا توجد قيود بعد");
+
+      v.innerHTML = sectionCard("دليل الحسابات", form + list) + sectionCard("القيود اليومية", jForm + jList);
+
+      $("accForm").addEventListener("submit", function (ev) {
+        ev.preventDefault();
+        accForm.name = $("ac-name").value; accForm.type = $("ac-type").value; accForm.balance = $("ac-bal").value;
+        if (!accForm.name.trim()) { accForm.error = "أدخل اسم الحساب"; return render(); }
+        var bal = accForm.balance.trim() === "" ? 0 : parseMoney(accForm.balance);
+        if (isNaN(bal)) { accForm.error = "الرصيد الافتتاحي ليس رقماً صحيحاً"; return render(); }
+        state.accounts.push({ id: state.seq.account++, name: accForm.name.trim(), type: accForm.type, balance: bal });
+        accForm.name = ""; accForm.balance = ""; accForm.error = "";
+        render();
+      });
+      $("journalForm").addEventListener("submit", function (ev) {
+        ev.preventDefault();
+        accForm.jDate = $("j-date").value; accForm.jDesc = $("j-desc").value;
+        accForm.jAccountId = Number($("j-acc").value); accForm.jDebit = $("j-debit").value; accForm.jCredit = $("j-credit").value;
+        if (!state.accounts.length) { accForm.jError = "أضف حساباً أولاً من دليل الحسابات"; return render(); }
+        if (!accForm.jDesc.trim()) { accForm.jError = "أدخل بيان القيد"; return render(); }
+        var d = accForm.jDebit.trim() === "" ? 0 : parseMoney(accForm.jDebit);
+        var cr = accForm.jCredit.trim() === "" ? 0 : parseMoney(accForm.jCredit);
+        if (isNaN(d) || isNaN(cr)) { accForm.jError = "المبالغ ليست أرقاماً صحيحة"; return render(); }
+        if (d === 0 && cr === 0) { accForm.jError = "أدخل مبلغاً مديناً أو دائناً"; return render(); }
+        var acc = byId(state.accounts, accForm.jAccountId) || state.accounts[0];
+        acc.balance += d - cr;
+        state.journal.push({ id: state.seq.journal++, date: accForm.jDate || today(), description: accForm.jDesc.trim(), accountId: acc.id, accountName: acc.name, debit: d, credit: cr });
+        accForm.jDesc = ""; accForm.jDebit = ""; accForm.jCredit = ""; accForm.jError = "";
+        render();
+      });
+    }
+
+    // ================= المخزون والجرد =================
+    var invForm = { editingId: 0, name: "", code: "", unit: "قطعة", qty: "", minQty: "", cost: "", sale: "", error: "",
+                    mItemId: 0, mKind: "in", mQty: "", mNote: "", mDate: null, mError: "" };
+    function resetItemForm() {
+      invForm.editingId = 0; invForm.name = ""; invForm.code = ""; invForm.unit = "قطعة";
+      invForm.qty = ""; invForm.minQty = ""; invForm.cost = ""; invForm.sale = ""; invForm.error = "";
+    }
+    function renderInventory(v) {
+      var c = cur();
+      var editing = invForm.editingId ? byId(state.items, invForm.editingId) : null;
+      var itemOptions = state.items.map(function (i) {
+        return '<option value="' + i.id + '"' + (invForm.mItemId === i.id ? " selected" : "") + ">" + esc(i.name) + "</option>";
+      }).join("");
+
+      var form =
+        '<form id="itemForm" class="form-grid cols-2m">' +
+        '<div class="field"><label for="it-name">اسم الصنف</label><input id="it-name" class="inp" value="' + esc(invForm.name) + '"></div>' +
+        '<div class="field"><label for="it-code">كود الصنف</label><input id="it-code" class="inp" value="' + esc(invForm.code) + '"></div>' +
+        '<div class="field"><label for="it-unit">الوحدة</label><input id="it-unit" class="inp" value="' + esc(invForm.unit) + '"></div>' +
+        '<div class="field"><label for="it-min">الحد الأدنى</label><input id="it-min" class="inp" inputmode="decimal" placeholder="0" value="' + esc(invForm.minQty) + '"></div>' +
+        (editing ? "" : '<div class="field"><label for="it-qty">الكمية الافتتاحية</label><input id="it-qty" class="inp" inputmode="decimal" placeholder="0" value="' + esc(invForm.qty) + '"></div>') +
+        '<div class="field"><label for="it-cost">سعر التكلفة (' + esc(c) + ')</label><input id="it-cost" class="inp" inputmode="decimal" placeholder="0.00" value="' + esc(invForm.cost) + '"></div>' +
+        '<div class="field"><label for="it-sale">سعر البيع (' + esc(c) + ')</label><input id="it-sale" class="inp" inputmode="decimal" placeholder="0.00" value="' + esc(invForm.sale) + '"></div>' +
+        '<div class="align-end"><button type="submit" class="btn-primary">' + (editing ? "حفظ التعديل" : "إضافة الصنف") + "</button>" +
+        (editing ? '<button type="button" id="cancelEditItem" class="btn-ghost">إلغاء</button>' : "") + "</div></form>" +
+        (invForm.error ? '<p class="form-error" role="alert">' + esc(invForm.error) + "</p>" : "");
+
+      var list = state.items.length
+        ? '<ul class="rows divided">' + state.items.map(function (i) {
+            var low = i.qty <= i.minQty;
+            return '<li class="row-between"><span><span class="black">' + esc(i.name) + "</span>" +
+              (i.code ? '<span class="muted"> (' + esc(i.code) + ")</span>" : "") +
+              '<span class="muted" style="display:block">تكلفة ' + fmtMoney(i.costPrice) + " — بيع " + fmtMoney(i.salePrice) + " " + esc(c) + "</span></span>" +
+              '<span style="display:flex; align-items:center; gap:.5rem"><span class="qty-badge' + (low ? " low" : "") + '">' + fmtQty(i.qty) + " " + esc(i.unit) + "</span>" +
+              '<button type="button" class="btn-outline" data-edit-item="' + i.id + '">تعديل</button>' + dangerBtn("del-item", i.id) + "</span></li>";
+          }).join("") + "</ul>"
+        : emptyNote("لا توجد أصناف بعد — أضف أول صنف من النموذج أعلاه");
+
+      var mForm =
+        '<form id="moveForm" class="form-grid cols-6">' +
+        '<div class="field"><label for="mv-item">الصنف</label><select id="mv-item" class="inp">' + itemOptions + "</select></div>" +
+        '<div class="field"><label for="mv-kind">نوع الحركة</label><select id="mv-kind" class="inp">' +
+        '<option value="in"' + (invForm.mKind === "in" ? " selected" : "") + '>إدخال (زيادة)</option>' +
+        '<option value="out"' + (invForm.mKind === "out" ? " selected" : "") + '>إخراج (نقص)</option>' +
+        '<option value="adjust"' + (invForm.mKind === "adjust" ? " selected" : "") + '>تسوية جرد (الكمية الفعلية)</option></select></div>' +
+        '<div class="field"><label for="mv-qty">الكمية</label><input id="mv-qty" class="inp" inputmode="decimal" value="' + esc(invForm.mQty) + '"></div>' +
+        '<div class="field"><label for="mv-note">ملاحظة</label><input id="mv-note" class="inp" value="' + esc(invForm.mNote) + '"></div>' +
+        '<div class="field"><label for="mv-date">التاريخ</label><input id="mv-date" type="date" class="inp" value="' + esc(invForm.mDate || today()) + '"></div>' +
+        '<div class="align-end"><button type="submit" class="btn-primary">تسجيل الحركة</button></div></form>' +
+        (invForm.mError ? '<p class="form-error" role="alert">' + esc(invForm.mError) + "</p>" : "");
+
+      var mList = state.moves.length
+        ? '<ul class="rows divided" style="margin-top:.75rem">' + state.moves.slice().reverse().slice(0, 100).map(function (mv) {
+            var lbl = mv.kind === "in" ? "إدخال" : mv.kind === "out" ? "إخراج" : "تسوية";
+            return '<li class="row-between"><span><span class="strong">' + esc(mv.itemName) + "</span>" +
+              (mv.note ? '<span class="muted" style="display:block">' + esc(mv.note) + "</span>" : "") + '</span>' +
+              '<span style="text-align:left"><span class="strong" style="display:block; color:' + (mv.kind === "out" ? "var(--danger)" : "var(--accent)") + '">' + lbl + " " + fmtQty(mv.qty) + '</span><span class="muted">' + esc(mv.date) + "</span></span></li>";
+          }).join("") + "</ul>"
+        : emptyNote("لا توجد حركات مخزون بعد");
+
+      v.innerHTML =
+        sectionCard(editing ? "تعديل صنف: " + editing.name : "إضافة صنف جديد", form) +
+        sectionCard("الأصناف", list) +
+        sectionCard("حركة المخزون والجرد", mForm + mList);
+
+      $("itemForm").addEventListener("submit", function (ev) {
+        ev.preventDefault();
+        invForm.name = $("it-name").value; invForm.code = $("it-code").value; invForm.unit = $("it-unit").value;
+        invForm.minQty = $("it-min").value; invForm.cost = $("it-cost").value; invForm.sale = $("it-sale").value;
+        if (!editing) invForm.qty = $("it-qty").value;
+        if (!invForm.name.trim()) { invForm.error = "أدخل اسم الصنف"; return render(); }
+        if (!invForm.unit.trim()) { invForm.error = "أدخل وحدة القياس"; return render(); }
+        var q = invForm.qty === "" ? 0 : Number(invForm.qty);
+        var mn = invForm.minQty === "" ? 0 : Number(invForm.minQty);
+        if (isNaN(q) || isNaN(mn)) { invForm.error = "الكميات ليست أرقاماً صحيحة"; return render(); }
+        var cp = invForm.cost === "" ? 0 : parseMoney(invForm.cost);
+        var sp = invForm.sale === "" ? 0 : parseMoney(invForm.sale);
+        if (isNaN(cp) || isNaN(sp)) { invForm.error = "الأسعار ليست أرقاماً صحيحة"; return render(); }
+        if (editing) {
+          editing.name = invForm.name.trim(); editing.code = invForm.code.trim(); editing.unit = invForm.unit.trim();
+          editing.minQty = mn; editing.costPrice = cp; editing.salePrice = sp;
+        } else {
+          var it = { id: state.seq.item++, name: invForm.name.trim(), code: invForm.code.trim(), unit: invForm.unit.trim(), qty: q, minQty: mn, costPrice: cp, salePrice: sp };
+          state.items.push(it);
+          if (q > 0) state.moves.push({ id: state.seq.move++, itemId: it.id, itemName: it.name, kind: "in", qty: q, note: "رصيد افتتاحي", date: today() });
+        }
+        resetItemForm();
+        render();
+      });
+      var cancelBtn = $("cancelEditItem");
+      if (cancelBtn) cancelBtn.addEventListener("click", function () { resetItemForm(); render(); });
+
+      $("moveForm").addEventListener("submit", function (ev) {
+        ev.preventDefault();
+        invForm.mItemId = Number($("mv-item").value); invForm.mKind = $("mv-kind").value;
+        invForm.mQty = $("mv-qty").value; invForm.mNote = $("mv-note").value; invForm.mDate = $("mv-date").value;
+        if (!state.items.length) { invForm.mError = "أضف صنفاً أولاً"; return render(); }
+        var mq = Number(invForm.mQty);
+        if (invForm.mQty === "" || isNaN(mq) || mq < 0) { invForm.mError = "أدخل كمية صحيحة"; return render(); }
+        var it = byId(state.items, invForm.mItemId) || state.items[0];
+        if (invForm.mKind === "in") it.qty += mq;
+        else if (invForm.mKind === "out") it.qty -= mq;
+        else it.qty = mq;
+        state.moves.push({ id: state.seq.move++, itemId: it.id, itemName: it.name, kind: invForm.mKind, qty: mq, note: invForm.mNote.trim(), date: invForm.mDate || today() });
+        invForm.mQty = ""; invForm.mNote = ""; invForm.mError = "";
+        render();
+      });
+    }
+
+    // ================= المشتريات / المبيعات =================
+    var tradeForms = {
+      purchase: null,
+      sale: null
+    };
+    function tradeForm(kind) {
+      if (!tradeForms[kind]) {
+        tradeForms[kind] = {
+          editingPartnerId: 0, pName: "", pPhone: "", pAddress: "", pError: "",
+          payAmounts: {}, invPartnerId: "", invDate: null, payType: "cash",
+          lines: [{ itemId: 0, qty: "1", price: "" }], invError: "", lastNumber: null
+        };
+      }
+      return tradeForms[kind];
+    }
+    function renderTrade(v, kind) {
+      var f = tradeForm(kind);
+      var c = cur();
+      var partnerKind = kind === "purchase" ? "supplier" : "customer";
+      var partnerTitle = kind === "purchase" ? "الموردون" : "العملاء";
+      var partnerOne = kind === "purchase" ? "مورد" : "عميل";
+      var partners = state.partners.filter(function (p) { return p.kind === partnerKind; });
+      var editingP = f.editingPartnerId ? byId(state.partners, f.editingPartnerId) : null;
+      var invoices = state.invoices.filter(function (x) { return x.kind === kind; }).slice().reverse();
+
+      var pForm =
+        '<form id="partnerForm" class="form-grid cols-4">' +
+        '<div class="field"><label for="p-name">الاسم</label><input id="p-name" class="inp" value="' + esc(f.pName) + '"></div>' +
+        '<div class="field"><label for="p-phone">رقم الهاتف</label><input id="p-phone" class="inp" value="' + esc(f.pPhone) + '"></div>' +
+        '<div class="field"><label for="p-address">العنوان</label><input id="p-address" class="inp" value="' + esc(f.pAddress) + '"></div>' +
+        '<div class="align-end"><button type="submit" class="btn-primary">' + (editingP ? "حفظ التعديل" : "إضافة " + partnerOne) + "</button>" +
+        (editingP ? '<button type="button" id="cancelEditPartner" class="btn-ghost">إلغاء</button>' : "") + "</div></form>" +
+        (f.pError ? '<p class="form-error" role="alert">' + esc(f.pError) + "</p>" : "");
+
+      var pList = partners.length
+        ? '<ul class="rows divided" style="margin-top:.75rem">' + partners.map(function (p) {
+            var payForm = p.balance > 0
+              ? '<form class="pay-form" data-pay-partner="' + p.id + '"><input class="inp" inputmode="decimal" placeholder="مبلغ الدفعة" aria-label="مبلغ دفعة" value="' + esc(f.payAmounts[p.id] || "") + '">' +
+                '<button type="submit" class="btn-primary" style="font-size:.875rem">' + (kind === "purchase" ? "تسجيل دفعة للمورد" : "تسجيل تحصيل من العميل") + "</button></form>"
+              : "";
+            return '<li><div class="row-between"><span><span class="black">' + esc(p.name) + "</span>" +
+              (p.phone ? '<span class="muted"> ' + esc(p.phone) + "</span>" : "") +
+              (p.address ? '<span class="muted" style="display:block">' + esc(p.address) + "</span>" : "") + '</span>' +
+              '<span style="display:flex; align-items:center; gap:.5rem"><span class="balance-badge' + (p.balance > 0 ? " owed" : "") + '">' +
+              (p.balance > 0 ? "مستحق: " + fmtMoney(p.balance) + " " + esc(c) : "لا يوجد رصيد") + "</span>" +
+              '<button type="button" class="btn-outline" data-edit-partner="' + p.id + '">تعديل</button>' + dangerBtn("del-partner", p.id) + "</span></div>" + payForm + "</li>";
+          }).join("") + "</ul>"
+        : emptyNote("لا يوجد " + partnerTitle + " بعد");
+
+      var invSection;
+      if (!state.items.length) {
+        invSection = emptyNote("أضف أصنافاً من إدارة المخزون أولاً حتى تستطيع إنشاء فواتير");
+      } else {
+        var partnerOptions = '<option value="">' + (kind === "purchase" ? "— بدون مورد —" : "— بدون عميل (نقدي) —") + "</option>" +
+          partners.map(function (p) {
+            return '<option value="' + p.id + '"' + (String(f.invPartnerId) === String(p.id) ? " selected" : "") + ">" + esc(p.name) + "</option>";
+          }).join("");
+        var linesTotal = 0;
+        var linesHtml = f.lines.map(function (l, idx) {
+          var item = byId(state.items, l.itemId);
+          var lineTotal = Math.round((Number(l.qty) || 0) * (parseMoney(l.price || "0") || 0));
+          linesTotal += lineTotal;
+          var itemOptions = '<option value="0">— اختر صنفاً —</option>' + state.items.map(function (i) {
+            return '<option value="' + i.id + '"' + (l.itemId === i.id ? " selected" : "") + ">" + esc(i.name) + " (متاح " + fmtQty(i.qty) + ")</option>";
+          }).join("");
+          return '<div class="line-row">' +
+            '<div class="field"><label>الصنف</label><select class="inp" data-line-item="' + idx + '">' + itemOptions + "</select></div>" +
+            '<div class="field"><label>الكمية</label><input class="inp" inputmode="decimal" data-line-qty="' + idx + '" value="' + esc(l.qty) + '"></div>' +
+            '<div class="field"><label>السعر (' + esc(c) + ')</label><input class="inp" inputmode="decimal" data-line-price="' + idx + '" value="' + esc(l.price) + '"></div>' +
+            '<div style="padding-bottom:.25rem; font-size:.875rem"><span class="strong">الإجمالي: ' + fmtMoney(lineTotal) + " " + esc(c) + "</span>" +
+            (item && kind === "sale" ? '<span class="muted" style="display:block">متاح ' + fmtQty(item.qty) + " " + esc(item.unit) + "</span>" : "") + "</div>" +
+            '<div style="padding-bottom:.25rem">' + (f.lines.length > 1 ? '<button type="button" class="btn-danger-outline" data-remove-line="' + idx + '">إزالة السطر</button>' : "") + "</div></div>";
+        }).join("");
+        invSection =
+          '<form id="invoiceForm">' +
+          '<div class="form-grid cols-3">' +
+          '<div class="field"><label for="inv-partner">' + partnerOne + '</label><select id="inv-partner" class="inp">' + partnerOptions + "</select></div>" +
+          '<div class="field"><label for="inv-date">تاريخ الفاتورة</label><input id="inv-date" type="date" class="inp" value="' + esc(f.invDate || today()) + '"></div>' +
+          '<div class="field"><label>طريقة الدفع</label><div class="pay-toggle">' +
+          '<button type="button" data-paytype="cash" class="' + (f.payType === "cash" ? "on" : "") + '">نقدي</button>' +
+          '<button type="button" data-paytype="credit" class="' + (f.payType === "credit" ? "on" : "") + '">آجل</button></div></div></div>' +
+          '<div id="invLines">' + linesHtml + "</div>" +
+          '<div style="margin-top:.75rem; display:flex; flex-wrap:wrap; align-items:center; gap:.75rem">' +
+          '<button type="button" id="addLine" class="btn-outline" style="padding:.5rem 1rem; font-size:1rem">+ إضافة سطر</button>' +
+          '<span style="font-size:1rem" class="black">إجمالي الفاتورة: ' + fmtMoney(linesTotal) + " " + esc(c) + "</span>" +
+          '<button type="submit" class="btn-primary">حفظ الفاتورة</button>' +
+          (f.lastNumber != null ? '<span class="saved-note">تم حفظ الفاتورة رقم ' + f.lastNumber + " ✓ و" + (kind === "purchase" ? "زاد" : "نقص") + " المخزون تلقائياً</span>" : "") +
+          "</div>" +
+          (f.invError ? '<p class="form-error" role="alert">' + esc(f.invError) + "</p>" : "") +
+          "</form>";
+      }
+
+      var invList = invoices.length
+        ? invoices.map(function (vv) {
+            return '<div class="invoice-box"><div class="row-between"><span class="black">فاتورة رقم ' + vv.number +
+              (vv.partnerName ? '<span style="color:var(--dim); font-weight:600"> — ' + esc(vv.partnerName) + "</span>" : "") + '</span>' +
+              '<span style="display:flex; align-items:center; gap:.5rem"><span class="tag">' + (vv.payType === "cash" ? "نقدي" : "آجل") + " — " + esc(vv.date) + '</span>' +
+              '<span class="black">' + fmtMoney(vv.total) + " " + esc(c) + "</span>" + dangerBtn("del-invoice", vv.id) + "</span></div>" +
+              '<ul class="invoice-lines">' + vv.lines.map(function (l) {
+                return "<li><span>" + esc(l.itemName) + " × " + fmtQty(l.qty) + "</span><span>" + fmtMoney(l.total) + " " + esc(c) + "</span></li>";
+              }).join("") + "</ul></div>";
+          }).join("")
+        : emptyNote("لا توجد فواتير بعد");
+
+      v.innerHTML =
+        sectionCard(editingP ? "تعديل " + partnerOne + ": " + editingP.name : partnerTitle + " — إضافة " + partnerOne, pForm + pList) +
+        sectionCard(kind === "purchase" ? "فاتورة شراء جديدة" : "فاتورة بيع جديدة", invSection) +
+        sectionCard(kind === "purchase" ? "سجل فواتير الشراء" : "سجل فواتير البيع", invList);
+
+      // حفظ حالة نموذج الشريك أثناء الكتابة
+      function syncPartner() { f.pName = $("p-name").value; f.pPhone = $("p-phone").value; f.pAddress = $("p-address").value; }
+      $("partnerForm").addEventListener("submit", function (ev) {
+        ev.preventDefault(); syncPartner();
+        if (!f.pName.trim()) { f.pError = "أدخل اسم " + (kind === "purchase" ? "المورد" : "العميل"); return render(); }
+        if (editingP) {
+          editingP.name = f.pName.trim(); editingP.phone = f.pPhone.trim(); editingP.address = f.pAddress.trim();
+          state.invoices.forEach(function (x) { if (x.partnerId === editingP.id) x.partnerName = editingP.name; });
+        } else {
+          state.partners.push({ id: state.seq.partner++, kind: partnerKind, name: f.pName.trim(), phone: f.pPhone.trim(), address: f.pAddress.trim(), balance: 0 });
+        }
+        f.editingPartnerId = 0; f.pName = ""; f.pPhone = ""; f.pAddress = ""; f.pError = "";
+        render();
+      });
+      var cancelP = $("cancelEditPartner");
+      if (cancelP) cancelP.addEventListener("click", function () {
+        f.editingPartnerId = 0; f.pName = ""; f.pPhone = ""; f.pAddress = ""; f.pError = ""; render();
+      });
+
+      // دفعات الشركاء
+      Array.prototype.forEach.call(v.querySelectorAll("[data-pay-partner]"), function (form) {
+        form.addEventListener("submit", function (ev) {
+          ev.preventDefault();
+          var pid = Number(form.getAttribute("data-pay-partner"));
+          var input = form.querySelector("input");
+          var amt = parseMoney(input.value || "");
+          if (isNaN(amt) || amt <= 0) { f.pError = "أدخل مبلغ دفعة صحيحاً"; return render(); }
+          var p = byId(state.partners, pid);
+          if (p) p.balance = Math.max(0, p.balance - amt);
+          f.payAmounts[pid] = ""; f.pError = "";
+          render();
+        });
+      });
+
+      if (state.items.length) {
+        function syncInvoiceHead() { f.invPartnerId = $("inv-partner").value; f.invDate = $("inv-date").value; }
+        function syncLines() {
+          Array.prototype.forEach.call(v.querySelectorAll("[data-line-item]"), function (sel) {
+            var i = Number(sel.getAttribute("data-line-item"));
+            f.lines[i].itemId = Number(sel.value);
+          });
+          Array.prototype.forEach.call(v.querySelectorAll("[data-line-qty]"), function (inp) {
+            f.lines[Number(inp.getAttribute("data-line-qty"))].qty = inp.value;
+          });
+          Array.prototype.forEach.call(v.querySelectorAll("[data-line-price]"), function (inp) {
+            f.lines[Number(inp.getAttribute("data-line-price"))].price = inp.value;
+          });
+        }
+        Array.prototype.forEach.call(v.querySelectorAll("[data-paytype]"), function (b) {
+          b.addEventListener("click", function () { syncInvoiceHead(); syncLines(); f.payType = b.getAttribute("data-paytype"); render(); });
+        });
+        Array.prototype.forEach.call(v.querySelectorAll("[data-line-item]"), function (sel) {
+          sel.addEventListener("change", function () {
+            syncInvoiceHead(); syncLines();
+            var i = Number(sel.getAttribute("data-line-item"));
+            var it = byId(state.items, f.lines[i].itemId);
+            if (it) f.lines[i].price = String((kind === "purchase" ? it.costPrice : it.salePrice) / 100);
+            render();
+          });
+        });
+        Array.prototype.forEach.call(v.querySelectorAll("[data-line-qty],[data-line-price]"), function (inp) {
+          inp.addEventListener("change", function () { syncInvoiceHead(); syncLines(); render(); });
+        });
+        Array.prototype.forEach.call(v.querySelectorAll("[data-remove-line]"), function (b) {
+          b.addEventListener("click", function () {
+            syncInvoiceHead(); syncLines();
+            f.lines.splice(Number(b.getAttribute("data-remove-line")), 1);
+            render();
+          });
+        });
+        $("addLine").addEventListener("click", function () {
+          syncInvoiceHead(); syncLines();
+          f.lines.push({ itemId: 0, qty: "1", price: "" });
+          render();
+        });
+        $("invoiceForm").addEventListener("submit", function (ev) {
+          ev.preventDefault(); syncInvoiceHead(); syncLines();
+          if (f.payType === "credit" && !f.invPartnerId) { f.invError = "اختر " + (kind === "purchase" ? "المورد" : "العميل") + " للفاتورة الآجلة"; return render(); }
+          for (var i = 0; i < f.lines.length; i++) {
+            var l = f.lines[i];
+            if (!l.itemId) { f.invError = "اختر الصنف في كل سطر"; return render(); }
+            if (!l.qty || isNaN(Number(l.qty)) || Number(l.qty) <= 0) { f.invError = "أدخل كمية صحيحة في كل سطر"; return render(); }
+            if (l.price === "" || isNaN(parseMoney(l.price))) { f.invError = "أدخل سعراً صحيحاً في كل سطر"; return render(); }
+            if (kind === "sale") {
+              var it0 = byId(state.items, l.itemId);
+              if (it0 && Number(l.qty) > it0.qty) { f.invError = "الكمية المطلوبة لـ «" + it0.name + "» أكبر من المتاح (" + fmtQty(it0.qty) + ")"; return render(); }
+            }
+          }
+          var partner = f.invPartnerId ? byId(state.partners, Number(f.invPartnerId)) : null;
+          var lines = f.lines.map(function (l) {
+            var it = byId(state.items, l.itemId);
+            var price = parseMoney(l.price);
+            var total = Math.round(Number(l.qty) * price);
+            if (kind === "purchase") it.qty += Number(l.qty); else it.qty -= Number(l.qty);
+            state.moves.push({ id: state.seq.move++, itemId: it.id, itemName: it.name, kind: kind === "purchase" ? "in" : "out", qty: Number(l.qty), note: (kind === "purchase" ? "فاتورة شراء رقم " : "فاتورة بيع رقم ") + state.seq[kind], date: f.invDate || today() });
+            return { itemId: it.id, itemName: it.name, qty: Number(l.qty), price: price, total: total };
+          });
+          var total = lines.reduce(function (s, l) { return s + l.total; }, 0);
+          var number = state.seq[kind]++;
+          state.invoices.push({ id: state.seq.invoice++, kind: kind, number: number, partnerId: partner ? partner.id : null, partnerName: partner ? partner.name : "", date: f.invDate || today(), payType: f.payType, total: total, lines: lines });
+          if (f.payType === "credit" && partner) partner.balance += total;
+          f.lastNumber = number;
+          f.lines = [{ itemId: 0, qty: "1", price: "" }];
+          f.invError = "";
+          render();
+        });
+      }
+    }
+
+    // ================= التقارير =================
+    function renderReports(v) {
+      var t = totals();
+      var c = cur();
+      var html = '<div class="stat-grid">' +
+        statCard("إجمالي المبيعات (" + t.salesCount + " فاتورة)", fmtMoney(t.sales), true) +
+        statCard("إجمالي المشتريات (" + t.purchasesCount + " فاتورة)", fmtMoney(t.purchases), true) +
+        statCard("الربح التقديري (مبيعات − تكلفة)", fmtMoney(t.profit), true) +
+        statCard("قيمة المخزون بسعر البيع", fmtMoney(t.stockSale), true) +
+        statCard("قيمة المخزون بالتكلفة", fmtMoney(t.stockCost), true) +
+        statCard("المستحق على العملاء", fmtMoney(t.customersOwed), true) +
+        statCard("المستحق للموردين", fmtMoney(t.suppliersOwed), true) +
+        statCard("إجمالي القيود (مدين / دائن)", fmtMoney(t.debit) + " / " + fmtMoney(t.credit), true) +
+        "</div>";
+      var accList = state.accounts.length
+        ? '<ul class="rows divided">' + state.accounts.map(function (a) {
+            return '<li class="row-between"><span><span class="strong">' + esc(a.name) + '</span><span class="tag">' + esc(ACCOUNT_TYPES[a.type] || a.type) + '</span></span><span class="black">' + fmtMoney(a.balance) + " " + esc(c) + "</span></li>";
+          }).join("") + "</ul>"
+        : emptyNote("لا توجد حسابات بعد");
+      html += sectionCard("أرصدة الحسابات", accList);
+      v.innerHTML = html;
+    }
+
+    // ================= حذف (بكل أنواعه) =================
+    function doDelete(action, id) {
+      if (action === "del-user") {
+        state.users = state.users.filter(function (u) { return u.id !== id; });
+      } else if (action === "del-account") {
+        state.accounts = state.accounts.filter(function (a) { return a.id !== id; });
+      } else if (action === "del-entry") {
+        var en = byId(state.journal, id);
+        if (en) {
+          var acc = byId(state.accounts, en.accountId);
+          if (acc) acc.balance -= en.debit - en.credit;
+          state.journal = state.journal.filter(function (e) { return e.id !== id; });
+        }
+      } else if (action === "del-item") {
+        state.items = state.items.filter(function (i) { return i.id !== id; });
+        if (invForm.editingId === id) resetItemForm();
+      } else if (action === "del-partner") {
+        state.partners = state.partners.filter(function (p) { return p.id !== id; });
+      } else if (action === "del-invoice") {
+        var inv = byId(state.invoices, id);
+        if (inv) {
+          inv.lines.forEach(function (l) {
+            var it = byId(state.items, l.itemId);
+            if (it) it.qty += inv.kind === "purchase" ? -l.qty : l.qty;
+          });
+          if (inv.payType === "credit" && inv.partnerId) {
+            var p = byId(state.partners, inv.partnerId);
+            if (p) p.balance = Math.max(0, p.balance - inv.total);
+          }
+          state.invoices = state.invoices.filter(function (x) { return x.id !== id; });
+        }
+      }
+      armedDelete = null;
+      render();
+    }
+
+    // ================= أحداث عامة =================
+    document.addEventListener("click", function (ev) {
+      var t = ev.target;
+      while (t && t !== document.body) {
+        if (t.getAttribute) {
+          var goKey = t.getAttribute("data-go");
+          if (goKey) { go(goKey); return; }
+          var arm = t.getAttribute("data-arm");
+          if (arm) { armedDelete = arm; render(); return; }
+          var act = t.getAttribute("data-act");
+          if (act) { doDelete(act, Number(t.getAttribute("data-id"))); return; }
+          var ei = t.getAttribute("data-edit-item");
+          if (ei) {
+            var it = byId(state.items, Number(ei));
+            if (it) {
+              invForm.editingId = it.id; invForm.name = it.name; invForm.code = it.code; invForm.unit = it.unit;
+              invForm.minQty = String(it.minQty); invForm.cost = String(it.costPrice / 100); invForm.sale = String(it.salePrice / 100);
+              invForm.error = ""; render(); window.scrollTo(0, 0);
+            }
+            return;
+          }
+          var ep = t.getAttribute("data-edit-partner");
+          if (ep) {
+            var p = byId(state.partners, Number(ep));
+            if (p) {
+              var f = tradeForm(state.dept === "purchases" ? "purchase" : "sale");
+              f.editingPartnerId = p.id; f.pName = p.name; f.pPhone = p.phone; f.pAddress = p.address; f.pError = "";
+              render(); window.scrollTo(0, 0);
+            }
+            return;
+          }
+        }
+        t = t.parentNode;
+      }
+    });
+
+    $("btnHome").addEventListener("click", function () { go("home"); });
+    $("btnLogout").addEventListener("click", function () {
+      state.user = null;
+      $("appView").classList.add("hidden");
+      $("loginView").classList.remove("hidden");
+      $("loginPass").value = "1";
+      $("loginError").textContent = "";
+    });
+
+    // ================= الدخول =================
+    $("loginUser").addEventListener("keydown", function (ev) {
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        var p = $("loginPass");
+        p.focus(); p.select();
+      }
+    });
+    $("loginForm").addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      var username = $("loginUser").value.trim();
+      var password = $("loginPass").value;
+      if (!username) { $("loginError").textContent = "أدخل اسم المستخدم"; $("loginUser").focus(); return; }
+      if (!password) { $("loginError").textContent = "أدخل كلمة المرور"; $("loginPass").focus(); return; }
+      var found = null;
+      state.users.forEach(function (u) { if (u.username === username && u.password === password) found = u; });
+      if (!found) {
+        $("loginError").textContent = "اسم المستخدم أو كلمة المرور غير صحيحة";
+        $("loginPass").value = "";
+        $("loginPass").focus();
+        return;
+      }
+      state.user = { username: found.username, role: found.role };
+      $("userChip").textContent = found.username;
+      $("loginError").textContent = "";
+      $("loginView").classList.add("hidden");
+      $("appView").classList.remove("hidden");
+      state.dept = "home";
+      render();
+    });
+</script>
+  </body>
+</html>
