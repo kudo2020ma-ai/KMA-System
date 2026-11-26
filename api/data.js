@@ -7,8 +7,9 @@
 // POST   /api/data  { "collection", "id", "data" }  → يحفظ/يحدّث → { "ok": true, "record": {...} }
 // DELETE /api/data?collection=X&id=Y      → { "ok": true, "deleted": true/false }
 //
-// المجموعات (collections) أمثلة: customers, suppliers, items, invoices,
-// purchases, sales, vouchers, journals, users, settings...
+// المجموعات (collections) أمثلة لنظام مشاريع المقاولات: projects, clients,
+// technicians, assignments, site-reports, quotations, contracts,
+// materials, payments, users, settings...
 // اسم المجموعة والمعرّف: أحرف وأرقام و _ و - فقط (حتى 64 حرفاً).
 // البيانات تُعزل حسب companyId الموجود في التوكن، فلا يرى موظف شركة
 // بيانات شركة أخرى.
