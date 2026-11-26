@@ -20,7 +20,7 @@ module.exports = async function handler(req, res) {
       db = 'error';
       return lib.sendJson(res, 503, {
         ok: false,
-        service: 'kma-shared-db',
+        service: 'mshry-shared-db',
         mode,
         db,
         jwtSecretConfigured: lib.isJwtSecretConfigured(),
@@ -32,7 +32,7 @@ module.exports = async function handler(req, res) {
 
   return lib.sendJson(res, 200, {
     ok: true,
-    service: 'kma-shared-db',
+    service: 'mshry-shared-db',
     mode,
     // persistent=false في وضع local-json: التخزين ملف محلي لا يدوم
     // في دوال Vercel بلا خادم (نظام ملفات للقراءة فقط + نسخ مؤقتة)،
