@@ -1,4 +1,4 @@
-// مكتبة مشتركة لدوال KMA: التوكن (HMAC) + طبقة التخزين.
+// مكتبة مشتركة لدوال نظام إدارة مشاريع المقاولات: التوكن (HMAC) + طبقة التخزين.
 // وضعان:
 //  1) الإنتاج (Vercel): عند وجود DATABASE_URL تُستخدم Vercel Postgres.
 //  2) التطوير المحلي: عند غياب DATABASE_URL يُستخدم ملف JSON محلي.
@@ -14,7 +14,7 @@ const fs = require('fs');
 const path = require('path');
 
 const DEV_SECRET_FALLBACK = 'dev-only-change-me-NOT-FOR-PRODUCTION';
-const DEFAULT_COMPANY_ID = 'kma-default';
+const DEFAULT_COMPANY_ID = 'mshry-default';
 
 function isPostgresMode() {
   return Boolean(process.env.DATABASE_URL);
@@ -137,9 +137,9 @@ function isValidName(value) {
 // أو ملف JSON المحلي. كل سجل: { company_id, collection, id, data, updated_at }
 
 function localDbPath() {
-  if (process.env.KMA_LOCAL_DB_PATH) return process.env.KMA_LOCAL_DB_PATH;
-  // بجانب مجلد api/ — أي في جذر المشروع: data/kma-local.json
-  return path.join(__dirname, '..', 'data', 'kma-local.json');
+  if (process.env.MSHRY_LOCAL_DB_PATH) return process.env.MSHRY_LOCAL_DB_PATH;
+  // بجانب مجلد api/ — أي في جذر المشروع: data/mshry-local.json
+  return path.join(__dirname, '..', 'data', 'mshry-local.json');
 }
 
 function readLocalDb() {
@@ -164,7 +164,7 @@ function writeLocalDb(records) {
 async function pgList(companyId, collection) {
   const { sql } = require('@vercel/postgres');
   const { rows } = await sql`
-    SELECT id, data, updated_at FROM kma_records
+    SELECT id, data, updated_at FROM mshry_records
     WHERE company_id = ${companyId} AND collection = ${collection}
     ORDER BY updated_at DESC, id ASC`;
   return rows.map((r) => ({ id: r.id, data: r.data, updated_at: r.updated_at }));
@@ -173,7 +173,7 @@ async function pgList(companyId, collection) {
 async function pgGet(companyId, collection, id) {
   const { sql } = require('@vercel/postgres');
   const { rows } = await sql`
-    SELECT id, data, updated_at FROM kma_records
+    SELECT id, data, updated_at FROM mshry_records
     WHERE company_id = ${companyId} AND collection = ${collection} AND id = ${id}`;
   if (!rows.length) return null;
   return { id: rows[0].id, data: rows[0].data, updated_at: rows[0].updated_at };
@@ -182,7 +182,7 @@ async function pgGet(companyId, collection, id) {
 async function pgUpsert(companyId, collection, id, data) {
   const { sql } = require('@vercel/postgres');
   const { rows } = await sql`
-    INSERT INTO kma_records (company_id, collection, id, data, updated_at)
+    INSERT INTO mshry_records (company_id, collection, id, data, updated_at)
     VALUES (${companyId}, ${collection}, ${id}, ${JSON.stringify(data)}::jsonb, NOW())
     ON CONFLICT (company_id, collection, id)
     DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()
@@ -193,7 +193,7 @@ async function pgUpsert(companyId, collection, id, data) {
 async function pgDelete(companyId, collection, id) {
   const { sql } = require('@vercel/postgres');
   const { rowCount } = await sql`
-    DELETE FROM kma_records
+    DELETE FROM mshry_records
     WHERE company_id = ${companyId} AND collection = ${collection} AND id = ${id}`;
   return rowCount > 0;
 }
