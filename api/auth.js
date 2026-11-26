@@ -3,7 +3,8 @@
 // النجاح: { "token": "...", "user": { "username", "fullName", "role" }, "companyId": "..." }
 // الفشل:  401 { "error": "بيانات الدخول غير صحيحة" }
 //
-// - الدخول الافتراضي للمدير: username = "1" و password = "1" (كما في النظام الحالي).
+// - الدخول الافتراضي للمدير 1/1 يعمل فقط عند عدم وجود أي مستخدم في قاعدة
+//   البيانات إطلاقاً (تهيئة أول مرة)؛ بعد زرع المدير تُقارن كلمة المرور المخزنة فقط.
 // - المستخدمون الآخرون يُقرأون من مجموعة "users" في قاعدة البيانات
 //   (سجل لكل مستخدم: id = اسم المستخدم، و data = { username, password, fullName, role }).
 //   يُنشئ المدير هؤلاء المستخدمين من داخل النظام (شاشة المستخدمين) فيحفظون
@@ -46,18 +47,9 @@ module.exports = async function handler(req, res) {
     return lib.sendJson(res, 400, { error: 'اسم المستخدم وكلمة المرور مطلوبان' });
   }
 
-  // 1) المدير الافتراضي 1/1 — يعمل دائماً، حتى قبل إنشاء أي مستخدم.
-  if (username === '1' && password === '1') {
-    const user = { username: '1', fullName: 'المدير', role: 'admin' };
-    const companyId = lib.DEFAULT_COMPANY_ID;
-    return lib.sendJson(res, 200, {
-      token: lib.createToken(user, companyId),
-      user,
-      companyId,
-    });
-  }
 
-  // 2) المستخدمون الآخرون من مجموعة users في قاعدة البيانات.
+  // 1) المستخدمون من مجموعة users في قاعدة البيانات — بما فيها حساب المدير "1"
+  //    إن وُجد؛ كلمة المرور تُقارن دائماً بالمخزنة، ولا يوجد أي تجاوز ثابت 1/1.
   try {
     const companyId = lib.DEFAULT_COMPANY_ID;
     const record =
@@ -82,6 +74,26 @@ module.exports = async function handler(req, res) {
   } catch (err) {
     console.error('auth lookup error:', err);
     return lib.sendJson(res, 500, { error: 'خطأ داخلي أثناء التحقق من المستخدم' });
+  }
+
+  // 2) تهيئة أول مرة فقط: إن لم يوجد أي مستخدم في قاعدة البيانات إطلاقاً
+  //    يُسمح بالدخول 1/1 (يُزرع المدير بعدها من النظام ويُحفظ في القاعدة).
+  //    إن وُجد أي مستخدم — ومنه حساب "1" بعد تغيير كلمة مروره — لا يعمل 1/1 أبداً.
+  if (username === '1' && password === '1') {
+    try {
+      const existing = await lib.listRecords(lib.DEFAULT_COMPANY_ID, 'users');
+      if (existing.length === 0) {
+        const user = { username: '1', fullName: 'المدير', role: 'admin' };
+        const companyId = lib.DEFAULT_COMPANY_ID;
+        return lib.sendJson(res, 200, {
+          token: lib.createToken(user, companyId),
+          user,
+          companyId,
+        });
+      }
+    } catch (err) {
+      console.error('auth bootstrap check error:', err);
+    }
   }
 
   return lib.sendJson(res, 401, { error: 'بيانات الدخول غير صحيحة' });
