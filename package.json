@@ -1,0 +1,1 @@
+{"dependencies":{"@vercel/postgres":"^0.10.0"},"description":"الواجهة الخلفية وقاعدة البيانات المشتركة لنظام KMA على Vercel (دوال بلا خادم + Vercel Postgres)","engines":{"node":">=18"},"name":"kma-shared-db","private":true,"scripts":{"test":"node test-local.js"},"version":"1.0.0"}
