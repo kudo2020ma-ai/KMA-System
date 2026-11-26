@@ -34,6 +34,10 @@ module.exports = async function handler(req, res) {
     ok: true,
     service: 'kma-shared-db',
     mode,
+    // persistent=false في وضع local-json: التخزين ملف محلي لا يدوم
+    // في دوال Vercel بلا خادم (نظام ملفات للقراءة فقط + نسخ مؤقتة)،
+    // فلا يجوز للعميل اعتباره قاعدة مشتركة. القاعدة الدائمة هي Postgres فقط.
+    persistent: lib.isPostgresMode(),
     db,
     jwtSecretConfigured: lib.isJwtSecretConfigured(),
     time: new Date().toISOString(),

@@ -24,6 +24,14 @@ module.exports = async function handler(req, res) {
   const companyId = auth.companyId || lib.DEFAULT_COMPANY_ID;
 
   try {
+    // في وضع local-json على Vercel لا يوجد تخزين دائم أصلاً (ملف المشروع
+    // للقراءة فقط، وكل استدعاء قد يعمل على نسخة مختلفة)، فالكتابة هنا
+    // كانت تفشل بصمت (500) أو تختفي بين الطلبات. نرفضها صراحة بـ 503
+    // بدلاً من إيهام العميل بنجاح كاذب؛ القراءة تبقى متاحة (تعيد فارغاً).
+    if (!lib.isPostgresMode() && process.env.VERCEL && (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE')) {
+      return lib.sendJson(res, 503, { error: 'التخزين المحلي المؤقت غير دائم على Vercel — أنشئ قاعدة Postgres من لوحة Vercel واربطها بالمشروع ثم أعد النشر' });
+    }
+
     if (req.method === 'GET') {
       const collection = String((req.query && req.query.collection) || '');
       const id = req.query && req.query.id ? String(req.query.id) : '';
