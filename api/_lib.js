@@ -34,7 +34,9 @@ function isJwtSecretConfigured() {
 
 // ---------- التوكن: JWT مبسّط بتوقيع HMAC-SHA256، بلا اعتماديات ----------
 // الصيغة: base64url(header).base64url(payload).base64url(signature)
-// الـ payload: { username, fullName, role, companyId, exp }
+// الـ payload: { username, fullName, role, companyId, rev, exp }
+// rev = رقم نسخة المستخدم لحظة إصدار التوكن؛ عند أي تعديل على المستخدم
+// (رمز/دور/صلاحيات) يرتفع rev في سجله، فتُرفض توكناته القديمة في /api/data.
 
 function base64url(input) {
   return Buffer.from(input).toString('base64url');
@@ -47,6 +49,7 @@ function createToken(user, companyId) {
     fullName: user.fullName || user.username,
     role: user.role || 'user',
     companyId: companyId || DEFAULT_COMPANY_ID,
+    rev: Number(user.rev) || 1,
     jti: crypto.randomBytes(12).toString('base64url'), // معرّف فريد لكل توكن
     exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60, // 7 أيام
   };
@@ -126,6 +129,31 @@ function requireAuth(req, res) {
     return null;
   }
   return decoded;
+}
+
+// هل أُبطل هذا التوكن بتعديل على المستخدم بعد إصداره؟
+// يُقارن rev في التوكن مع rev في سجل المستخدم الحالي؛ عند الاختلاف
+// يكون التوكن مبطلاً (تغيّرت كلمة المرور أو الدور أو الصلاحيات).
+// - لا سجل للمستخدم بعد (توكن التهيئة الأولى) → غير مبطل.
+// - خطأ في قاعدة البيانات → غير مبطل (فتح عند الخطأ حتى لا تُقفل
+//   البيانات كلها بعطل عابر؛ الإبطال الأساسي يفرضه النظام في الواجهة
+//   عبر validateSession عند كل عرض).
+async function isTokenRevoked(decoded) {
+  try {
+    if (!decoded || !decoded.username) return false;
+    const companyId = decoded.companyId || DEFAULT_COMPANY_ID;
+    let row = await getRecord(companyId, 'users', decoded.username);
+    if (!row) {
+      const all = await listRecords(companyId, 'users');
+      row = all.find((r) => r.data && r.data.username === decoded.username) || null;
+    }
+    if (!row || !row.data) return false;
+    const storedRev = Number(row.data.rev) || 1;
+    const tokenRev = Number(decoded.rev) || 1;
+    return storedRev !== tokenRev;
+  } catch (e) {
+    return false;
+  }
 }
 
 function isValidName(value) {
@@ -249,6 +277,7 @@ module.exports = {
   isJwtSecretConfigured,
   createToken,
   verifyToken,
+  isTokenRevoked,
   setCors,
   sendJson,
   parseBody,
