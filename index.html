@@ -581,7 +581,15 @@ function doLogin(){
     return true;
   }
   if(SYNC.mode==="server"){
-    return serverLogin(un,pw).then(function(userObj){return finish(userObj);}).catch(function(){
+    /* إصلاح دخول الأجهزة الجديدة: بعد نجاح دخول الخادم صار لدينا توكن،
+       فنسحب المستخدمين (وبقية البيانات) من الخادم أولاً — قبل التحقق
+       المحلي في finish() — لأن مستخدماً أُنشئ من جهاز آخر قد لا يكون
+       موجوداً في النسخة المحلية لهذا الجهاز، فكان الدخول يُرفض رغم
+       صحة بياناته. سحب ما قبل الدخول مستحيل لأنه بلا توكن. إن فشل
+       السحب يُحافَظ على السلوك السابق (finish بالنسخة المحلية). */
+    return serverLogin(un,pw).then(function(userObj){
+      return syncPullFromServer().then(function(){return finish(userObj);});
+    }).catch(function(){
       var local=localLogin(un,pw);
       if(local&&!local.error)return finish(local);
       if(local&&local.error){fail(local.error);return false;}
