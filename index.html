@@ -518,7 +518,7 @@ function myNotifications(){
 var AUDIT_ACTIONS={
   login_success:"تسجيل دخول",login_failed:"محاولة دخول فاشلة",logout:"تسجيل خروج",
   create_client:"إنشاء عميل",create_project:"إنشاء مشروع",delete_project:"حذف مشروع",
-  assign:"إسناد فنيين",confirm_receipt:"تأكيد استلام مهمة",add_media:"رفع وسائط معاينة",
+  assign:"إسناد فنيين",confirm_receipt:"اعتماد الفني للمهمة",add_media:"رفع وسائط معاينة",
   submit_inspection:"إرسال تقرير معاينة",inspection_accept:"قبول المعاينة",inspection_reject:"رفض المعاينة",
   create_quotation:"إنشاء عرض سعر",send_quotation:"إرسال عرض السعر للعميل",
   client_accept:"قبول العميل للعرض",client_reject:"رفض العميل للعرض",
@@ -582,8 +582,10 @@ function assignTechnicians(projectId,technicianIds){
 function confirmReceipt(assignmentId){
   var a=null;for(var i=0;i<state.assignments.length;i++)if(String(state.assignments[i].id)===String(assignmentId))a=state.assignments[i];
   if(!a)return {error:"المهمة غير موجودة."};
-  if(state.user&&String(a.technicianId)!==String(state.user.id)&&state.user.role!=="gm")return {error:"هذه المهمة ليست لك."};
-  a.status="accepted";a.acceptedAt=nowISO();var _cp=projectById(a.projectId);logAudit("confirm_receipt","تأكيد استلام مهمة المشروع "+(_cp?_cp.number:""),_cp?_cp.number:"","مهامي");save();return {assignment:a};
+  if(!state.user)return {error:"سجّل دخولك أولاً."};
+  if(String(a.technicianId)!==String(state.user.id))return {error:"هذه المهمة ليست لك — الاعتماد يتم بيوزر الفني المسندة إليه المهمة."};
+  if(a.status==="accepted")return {error:"المهمة معتمدة من الفني بالفعل."};
+  a.status="accepted";a.acceptedAt=nowISO();var _cp=projectById(a.projectId);logAudit("confirm_receipt","اعتماد الفني «"+(a.technicianName||state.user.username)+"» للمهمة — المشروع "+(_cp?_cp.number:""),_cp?_cp.number:"","مهامي");save();return {assignment:a};
 }
 function addMedia(projectId,kind,name,size,dataUrl,note){
   var p=projectById(projectId);if(!p)return {error:"المشروع غير موجود."};
@@ -966,23 +968,20 @@ function waLinkForQuote(qid){
   var msg="السلام عليكم، عرض السعر رقم "+q.number+" — المشروع: "+(p?p.title:"")+" — المواد: "+items+" — الإجمالي شامل الضريبة: "+fmtM(q.total)+" "+((state.settings[0]||{}).currency||"ر.س");
   return {url:"https://wa.me/"+phone+"?text="+encodeURIComponent(msg),phone:phone};
 }
-/* رابط واتساب الفني المُسند: رسالة جاهزة فيها رقم المشروع وعنوانه،
-   اسم العميل ورقمه، العمل المطلوب، ونوع المشروع. الإرسال نفسه يتم
-   بفتح wa.me من متصفح المدير (ليس إرسالاً تلقائياً من الخادم) —
-   واتساب لا يوفّر إرسالاً من الخادم بلا مزوّد رسمي مدفوع. */
+var SITE_URL="https://kma-system.vercel.app";
+/* رابط واتساب الفني المُسند: إشعار مختصر فقط بوجود مهمة جديدة —
+   الفني يدخل النظام بيوزره الخاص لعرض المهام واعتمادها من داخل
+   النظام. لا تُرسل تفاصيل المهمة (العنوان واسم العميل ورقمه والعمل
+   المطلوب) عبر واتساب إطلاقاً؛ التفاصيل الكاملة تبقى داخل النظام
+   فقط بعد تسجيل دخول الفني. الإرسال نفسه يتم بفتح wa.me من
+   متصفح المدير (ليس إرسالاً تلقائياً من الخادم) — واتساب لا يوفّر
+   إرسالاً من الخادم بلا مزوّد رسمي مدفوع. */
 function buildTechnicianWhatsApp(projectId,technicianId){
   var p=projectById(projectId);if(!p)return {error:"المشروع غير موجود."};
   var t=userById(technicianId);if(!t)return {error:"الفني غير موجود."};
   var phone=normalizePhone(t.phone);
   if(!phone)return {error:"رقم جوال الفني «"+(t.fullName||t.username)+"» غير مسجل — سجّله من شاشة المستخدمين أولاً."};
-  var cl=clientById(p.clientId);
-  var clPhone=cl&&cl.phone?cl.phone:"—";
-  var msg="السلام عليكم "+(t.fullName||t.username)+"، مهمة جديدة في نظام إدارة مشاريع المقاولات:\n"+
-    "رقم المشروع: "+p.number+"\n"+
-    "عنوان المشروع: "+(p.address||"—")+"\n"+
-    "العميل: "+p.clientName+" — جواله: "+clPhone+"\n"+
-    "العمل المطلوب: "+(p.description||p.title||"—")+"\n"+
-    "نوع المشروع: "+p.type;
+  var msg="لديك مهمة جديدة في نظام إدارة مشاريع المقاولات — سجّل دخولك بيوزرك لعرض المهام واعتمادها\n"+SITE_URL;
   return {url:"https://wa.me/"+phone+"?text="+encodeURIComponent(msg),phone:phone,technicianId:t.id,projectId:p.id};
 }
 function sendTechnicianWhatsApp(projectId,technicianId){
@@ -1490,7 +1489,7 @@ function doAssign(pid){
   var m2=$("projMsg");
   if(m2){
     var h='<div class="okbox">تم إسناد '+r.assigned.length+' فني/فنيين وأُرسل الإشعار لكل منهم داخل النظام.</div>';
-    h+='<div class="card" style="border:2px solid var(--green)"><h3>📱 إرسال واتساب للفنيين</h3><p class="muted">اضغط الزر لكل فني لفتح واتساب برسالة جاهزة فيها: رقم المشروع وعنوانه، اسم العميل ورقمه، العمل المطلوب، ونوع المشروع. الإرسال يتم من متصفحك عبر wa.me وليس تلقائياً من الخادم.</p>';
+    h+='<div class="card" style="border:2px solid var(--green)"><h3>📱 إرسال واتساب للفنيين</h3><p class="muted">اضغط الزر لكل فني لفتح واتساب بإشعار مختصر فقط: «لديك مهمة جديدة — سجّل دخولك بيوزرك لعرض المهام واعتمادها» مع رابط النظام. تفاصيل المهمة (العنوان واسم العميل ورقمه والعمل) لا تُرسل عبر واتساب؛ الفني يراها داخل النظام بعد تسجيل دخوله بيوزره. الإرسال يتم من متصفحك عبر wa.me وليس تلقائياً من الخادم.</p>';
     r.assigned.forEach(function(a){
       var w=buildTechnicianWhatsApp(pid,a.technicianId);
       if(w.error)h+='<p class="err">'+esc(w.error)+'</p>';
@@ -1503,7 +1502,7 @@ function doAssign(pid){
      الأزرار أعلاه تكفي حتى لا تُفتح نوافذ كثيرة دفعة واحدة). */
   if(r.assigned.length===1&&typeof confirm==="function"){
     var w0=buildTechnicianWhatsApp(pid,r.assigned[0].technicianId);
-    if(!w0.error&&confirm("تم الإسناد. هل تريد فتح واتساب للفني "+r.assigned[0].technicianName+" الآن لإرسال تفاصيل المهمة؟"))sendTechnicianWhatsApp(pid,r.assigned[0].technicianId);
+    if(!w0.error&&confirm("تم الإسناد. هل تريد فتح واتساب للفني "+r.assigned[0].technicianName+" الآن لإرسال إشعار بوجود مهمة؟"))sendTechnicianWhatsApp(pid,r.assigned[0].technicianId);
   }
 }
 function doWaTechnician(pid,tid){var r=sendTechnicianWhatsApp(pid,tid);if(r&&r.error)alert(r.error);}
@@ -1539,7 +1538,7 @@ function showProject(pid){
   '<p><b>العميل:</b> '+esc(p.clientName)+' — <span class="num" dir="ltr">'+esc(cl?cl.phone||"":"")+'</span> — '+esc(p.address)+'</p>'+
   '<p><b>النوع:</b> '+esc(p.type)+' — <b>الحالة:</b> '+statusBadge(p.status,"project")+'</p>'+
   '<p><b>وصف العمل:</b> '+esc(p.description||"—")+'</p>'+
-  '<h3>الفنيون المسندون</h3>'+(asg.length?asg.map(function(a){return '<p>'+esc(a.technicianName)+' — '+(a.status==="accepted"?"استلم المهمة ✓":"بانتظار تأكيد الاستلام")+'</p>';}).join(""):'<p class="muted">لم يُسند فنيون بعد.</p>')+
+  '<h3>الفنيون المسندون</h3>'+(asg.length?asg.map(function(a){return '<p>'+esc(a.technicianName)+' — '+(a.status==="accepted"?("معتمدة من الفني ✓"+(a.acceptedAt?" — "+fmtDateTime(a.acceptedAt):"")):"بانتظار اعتماد الفني")+'</p>';}).join(""):'<p class="muted">لم يُسند فنيون بعد.</p>')+
   '<h3>صور وفيديو المعاينة ('+media.length+')</h3>'+(media.length?media.map(function(m){return '<p>• '+(m.kind==="photo"?"صورة":"فيديو")+' — '+esc(m.name)+' — '+esc(m.note||"")+'</p>';}).join(""):'<p class="muted">لا توجد وسائط بعد.</p>')+
   '<h3>عروض الأسعار</h3>'+(qs.length?qs.map(function(q){return '<p>• '+esc(q.number)+' — '+statusBadge(q.status,"quote")+(canPrice()?' — <span class="num">'+fmtM(q.total)+'</span>':"")+'</p>';}).join(""):'<p class="muted">لا توجد عروض بعد.</p>')+'</div>';
   var b=$("projectBox");if(b)b.innerHTML=h;
@@ -1563,7 +1562,7 @@ function doAddProject(){
 function screenTasks(){
   var u=state.user;
   var myAsg=state.assignments.filter(function(a){return String(a.technicianId)===String(u.id);});
-  var h='<div class="card"><h2>مهامي</h2><p class="muted">مهامك المسندة من مدير المشاريع — اضغط «تأكيد الاستلام» ثم ارفع صور الموقع وأرسل تقرير المعاينة.</p><div id="taskMsg"></div>';
+  var h='<div class="card"><h2>مهامي</h2><p class="muted">مهامك المسندة من مدير المشاريع — اضغط «اعتماد المهمة» ثم ارفع صور الموقع وأرسل تقرير المعاينة.</p><div id="taskMsg"></div>';
   if(!myAsg.length)h+='<p class="muted">لا توجد مهام مسندة إليك حالياً.</p>';
   myAsg.slice().reverse().forEach(function(a){
     var p=projectById(a.projectId);if(!p)return;
@@ -1580,7 +1579,7 @@ function screenTasks(){
     (phone?'<a class="btn btn-navy btn-sm" href="tel:'+esc(phone)+'">📞 اتصال بالعميل</a>':"")+
     (waPhone?'<a class="btn btn-green btn-sm" target="_blank" rel="noopener" href="https://wa.me/'+esc(waPhone)+'">واتساب</a>':"")+
     '<a class="btn btn-ghost btn-sm" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(p.address||"")+'">🗺 خريطة الموقع</a>'+
-    (a.status==="pending"?'<button type="button" class="btn btn-gold btn-sm" onclick="doConfirmReceipt(\''+a.id+'\')">تأكيد استلام المهمة</button>':'<span class="badge b-accepted">تم تأكيد الاستلام ✓</span>')+
+    (a.status==="pending"?'<button type="button" class="btn btn-gold btn-sm" onclick="doConfirmReceipt(\''+a.id+'\')">اعتماد المهمة</button>':'<span class="badge b-accepted">معتمدة من الفني ✓'+(a.acceptedAt?' — '+fmtDateTime(a.acceptedAt):"")+'</span>')+
     '</div>'+
     '<h3>معاينة الموقع — صور وفيديو</h3>'+
     '<p class="warn">الصور تُحفظ داخل النظام. أما الفيديو: <b>الفيديو الكبير لا يُحفظ داخل ملف البيانات (JSON)</b> — يُسجَّل اسم الملف وحجمه وملاحظتك فقط، ويُحفظ الفيديو نفسه خارج النظام (أرسله للمدير عبر واتساب مثلاً إن كان كبيراً). الصور الكبيرة جداً (فوق 3 ميغابايت) قد تفشل في الحفظ — صغّر الصورة قبل الرفع.</p>'+
