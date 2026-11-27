@@ -181,6 +181,14 @@ var COMPANY_ID="mshry-default";
 var COMPANY_DEFAULTS={companyName:"شركة بصمة المشاعر المتطورة",companyNameEn:"BASSMAT ALMASHAEIR ADVANCED COMPANY",commercialReg:"4031264916",address:"المملكة العربية السعودية — العزيزية، شارع عبدالله الخياط",phones:"0555645215 - 0125124905",email:"bassmat.co@gmail.com"};
 var BKKEY="MSHRY_backup_company";
 var BKMETA="MSHRY_backup_meta_company";
+/* ---------- تصفير النظام: علامة التصفير (tombstone) ----------
+   RESET_KEY مفتاح محلي يحمل طابع زمني لآخر تصفير؛ وأي صف (محلي أو على
+   الخادم) أقدم منه هو بيانات ما قبل التصفير فيُسقط ولا يُدمج ولا يُدفع.
+   مجموعة الخادم reset_markers تحمل السجل الوحيد الباقي بعد التصفير. */
+var RESET_KEY="MSHRY_reset_marker_company";
+var RESET_COLL="reset_markers";
+var RESET_ID="last-reset";
+var PURGE_COLLECTIONS=["users","clients","projects","assignments","media","quotations","approvals","contracts","material_issues","payments","notifications","material_returns","transactions","items","audit_log","employees","leaves"];
 var ADMIN_USER="1";
 var COLLECTIONS=["users","clients","projects","assignments","media","quotations","approvals","contracts","material_issues","payments","notifications","settings","counters","material_returns","transactions","items","audit_log"];
 var PROJECT_TYPES=["تركيب كاميرات","صيانة","توريد أدوات سلامة","مضخات","أخرى"];
@@ -247,10 +255,54 @@ function defState(){return {
   counters:[{id:"main",project:0,quotation:0,contract:0,payment:0,client:0,"return":0,transaction:0,item:0}],
   employees:[],leaves:[]
 };}
+/* طابع الصف الزمني: أحدث حقل زمني متاح فيه. */
+function rowTime(r){if(!r||typeof r!=="object")return null;return r.updatedAt||r.createdAt||r.at||r.notifiedAt||null;}
+function getResetMarker(){try{var raw=localStorage.getItem(RESET_KEY);if(!raw)return null;var m=JSON.parse(raw);if(m&&m.at)return {at:String(m.at),by:m.by||"1"};}catch(e){}return null;}
+function setResetMarker(m){try{localStorage.setItem(RESET_KEY,JSON.stringify({at:String(m.at),by:m.by||"1"}));}catch(e){}}
+/* يسقط من كائن حالة كل صف أقدم من طابع التصفير، ويعيد الإعدادات
+   والعدادات إلى الافتراضيات إن كانت أقدم منه (أو بلا طابع) مختومة
+   بطابع التصفير نفسه حتى تنجو من حراس الدمج والدفع. الصفوف بلا أي
+   طابع زمني تُسقط أيضاً — كل صفوف ما بعد التصفير تحمل طابعاً. */
+function purgeStaleRows(st,at){
+  var changed=false;
+  PURGE_COLLECTIONS.forEach(function(c){
+    if(!Array.isArray(st[c]))return;
+    var kept=st[c].filter(function(row){
+      if(!row||typeof row!=="object")return false;
+      var t=rowTime(row);
+      return !!t&&String(t)>=String(at);
+    });
+    if(kept.length!==st[c].length){st[c]=kept;changed=true;}
+  });
+  if(Array.isArray(st.reset_markers)){
+    var kept2=st.reset_markers.filter(function(r){return r&&r.at&&String(r.at)>=String(at);});
+    if(kept2.length!==st.reset_markers.length){st.reset_markers=kept2;changed=true;}
+  }
+  return changed;
+}
+function applyResetMarkerTo(st,at){
+  if(!at)return false;
+  var changed=purgeStaleRows(st,at);
+  /* الإعدادات والعدادات مفردتان بلا طوابع أصلاً؛ إن كانتا أقدم من
+     التصفير (أو بلا طابع) أُعيدتا إلى الافتراضيات مختومتين بطابعه،
+     وإن كانتا أحدث منه (تعديل بعد التصفير) تُركتا كما هما. */
+  var d=defState();
+  if(!Array.isArray(st.settings)||!st.settings.length||!((st.settings[0].updatedAt||"")>=at)){
+    st.settings=[d.settings[0]];st.settings[0].updatedAt=at;changed=true;
+  }
+  if(!Array.isArray(st.counters)||!st.counters.length||!((st.counters[0].updatedAt||"")>=at)){
+    st.counters=[d.counters[0]];st.counters[0].updatedAt=at;changed=true;
+  }
+  return changed;
+}
 function loadState(){
   var raw=null;
   try{raw=localStorage.getItem(COMPANY_KEY);}catch(e){}
-  if(raw){try{var s=JSON.parse(raw);if(s&&s.settings){return normalizeState(s);}}catch(e){}}
+  var mk=getResetMarker();
+  if(raw){try{var s=JSON.parse(raw);if(s&&s.settings){var d=normalizeState(s);if(mk&&mk.at)applyResetMarkerTo(d,mk.at);return d;}}catch(e){}}
+  /* بعد التصفير لا تُبعث النسخة الاحتياطية المحلية من جديد: نسخة ما قبل
+     التصفير قد تحمل بيانات أقدم من علامته فتُعيد الممسوح. */
+  if(mk&&mk.at)return defState();
   try{var bk=localStorage.getItem(BKKEY);if(bk){var s2=JSON.parse(bk);if(s2&&s2.settings){try{localStorage.setItem(COMPANY_KEY,bk);}catch(e){}return normalizeState(s2);}}}catch(e){}
   return defState();
 }
@@ -302,11 +354,11 @@ function ensureAdminUser(){
 /* يُزرع المدير 1/1 فقط عند غياب حساب "1" تماماً. إن وُجد — حتى بعد تغيير
    كلمة مروره أو إيقافه — لا يُمسّ إطلاقاً. */
 ensureAdminUser();saveLocal();
-function saveLocal(){try{var j=JSON.stringify(state);localStorage.setItem(COMPANY_KEY,j);localStorage.setItem(BKKEY,j);localStorage.setItem(BKMETA,new Date().toISOString());}catch(e){}}
+function saveLocal(){var _mk=getResetMarker();if(_mk&&_mk.at)applyResetMarkerTo(state,_mk.at);try{var j=JSON.stringify(state);localStorage.setItem(COMPANY_KEY,j);localStorage.setItem(BKKEY,j);localStorage.setItem(BKMETA,new Date().toISOString());}catch(e){}}
 function save(){saveLocal();scheduleSyncPush();}
 function counters(){if(!state.counters||!state.counters.length)state.counters=[{id:"main",project:0,quotation:0,contract:0,payment:0,client:0,"return":0,transaction:0,item:0}];return state.counters[0];}
 function nextSerial(kind,prefix){
-  var c=counters();c[kind]=(Number(c[kind])||0)+1;
+  var c=counters();c[kind]=(Number(c[kind])||0)+1;c.updatedAt=nowISO();
   var n=prefix+"-"+String(c[kind]).padStart(4,"0");
   while(isSerialUsed(kind,n)){c[kind]++;n=prefix+"-"+String(c[kind]).padStart(4,"0");}
   return n;
@@ -320,8 +372,8 @@ function isSerialUsed(kind,num){
 function peekSerial(kind,prefix){var c=counters();return prefix+"-"+String((Number(c[kind])||0)+1).padStart(4,"0");}
 
 /* ---------- المزامنة مع قاعدة الخادم (العقد المعتمد نفسه) ---------- */
-var SYNC={mode:"local",token:null,companyId:null,busy:false,lastSync:null,checked:false,serverMode:null,serverHealthy:true,pushFailed:0};
-var SYNC_COLLECTIONS=[["users","users"],["clients","clients"],["projects","projects"],["assignments","assignments"],["media","media"],["quotations","quotations"],["approvals","approvals"],["contracts","contracts"],["material_issues","material_issues"],["payments","payments"],["notifications","notifications"],["settings","settings"],["counters","counters"],["material_returns","material_returns"],["transactions","transactions"],["items","items"],["audit_log","audit_log"]];
+var SYNC={mode:"local",token:null,companyId:null,busy:false,lastSync:null,checked:false,serverMode:null,serverHealthy:true,pushFailed:0,resetAt:null};
+var SYNC_COLLECTIONS=[["users","users"],["clients","clients"],["projects","projects"],["assignments","assignments"],["media","media"],["quotations","quotations"],["approvals","approvals"],["contracts","contracts"],["material_issues","material_issues"],["payments","payments"],["notifications","notifications"],["settings","settings"],["counters","counters"],["material_returns","material_returns"],["transactions","transactions"],["items","items"],["audit_log","audit_log"],["reset_markers","reset_markers"]];
 var SYNC_PUSH_TIMER=null;
 function syncHeaders(){var h={"Content-Type":"application/json"};if(SYNC.token)h["Authorization"]="Bearer "+SYNC.token;return h;}
 function syncSetBadge(){
@@ -388,12 +440,39 @@ function syncPullFromServer(){
   });
   return Promise.all(jobs).then(function(results){
     var changed=false;var serverEmptyEverywhere=true;var localHasData=false;
+    /* علامة التصفير أولاً: أي صف أقدم منها (محلي أو خادم) هو بيانات ما
+       قبل التصفير — يُسقط قبل أي دمج، فلا يعود إلى المحلي ولا يُدفع. */
+    var resetAt=null;var resetBy="1";
+    results.forEach(function(res){
+      if(res&&res.key==="reset_markers"&&Array.isArray(res.rows)){
+        res.rows.forEach(function(r){if(r&&r.at&&(!resetAt||String(r.at)>String(resetAt))){resetAt=String(r.at);resetBy=r.by||"1";}});
+      }
+    });
+    if(resetAt){
+      SYNC.resetAt=resetAt;
+      if(applyResetMarkerTo(state,resetAt))changed=true;
+      var _mk=getResetMarker();
+      if(!_mk||_mk.at!==resetAt)setResetMarker({at:resetAt,by:resetBy});
+    }
     results.forEach(function(res){
       if(!res||res.rows===null)return;
-      if(res.rows.length)serverEmptyEverywhere=false;
+      if(res.key==="reset_markers"){
+        var kept=(res.rows||[]).filter(function(r){return r&&r.at&&(!resetAt||String(r.at)>=String(resetAt));});
+        if(JSON.stringify(kept)!==JSON.stringify(state.reset_markers||[])){state.reset_markers=kept;changed=true;}
+        return; /* العلامة وحدها لا تعني أن الخادم فيه بيانات أعمال */
+      }
+      var rows=res.rows;
+      if(resetAt){
+        rows=rows.filter(function(r){
+          if(!r||typeof r!=="object")return false;
+          if(res.key==="settings"||res.key==="counters")return (r.updatedAt||"")>=resetAt;
+          var t=rowTime(r);return !!t&&String(t)>=resetAt;
+        });
+      }
+      if(rows.length)serverEmptyEverywhere=false;
       var local=state[res.key]||[];
       if(local.length)localHasData=true;
-      var merged=syncMergeRows(local,res.rows);
+      var merged=syncMergeRows(local,rows);
       if(JSON.stringify(merged)!==JSON.stringify(local)){state[res.key]=merged;changed=true;}
     });
     /* الإصلاح الذاتي لحساب «1» بعد المزامنة: إن أصلح ensureAdminUser
@@ -427,6 +506,14 @@ function syncPushNow(){
     var rows=state[pair[1]]||[];
     rows.forEach(function(row){
       if(!row||row.id===undefined)return;
+      /* حارس التصفير: لا يُدفع أي صف أقدم من علامة التصفير، ولا صف
+         بلا طابع (لا يمكن إثبات أنه بعدها) — فيمنع تبويب قديم من
+         إعادة بذر الخادم الفارغ ببيانات ما قبل التصفير. */
+      if(SYNC.resetAt){
+        if(pair[1]==="settings"||pair[1]==="counters"){if(!((row.updatedAt||"")>=SYNC.resetAt))return;}
+        else if(pair[1]==="reset_markers"){if(!(row.at&&String(row.at)>=SYNC.resetAt))return;}
+        else{var _t=rowTime(row);if(!_t||String(_t)<SYNC.resetAt)return;}
+      }
       jobs.push(apiPost(pair[0],String(row.id),row).then(function(){return true;}).catch(function(){return false;}));
     });
   });
@@ -548,6 +635,7 @@ var AUDIT_ACTIONS={
   record_transaction:"تسجيل حركة حسابات",create_user:"إنشاء مستخدم",update_user:"تعديل مستخدم",
   delete_user:"حذف مستخدم",create_user_denied:"محاولة إنشاء مستخدم مرفوضة",update_user_denied:"محاولة تعديل مستخدم مرفوضة",delete_user_denied:"محاولة حذف مستخدم مرفوضة",save_settings:"حفظ الإعدادات",save_setup:"حفظ تهيئة النظام",
   backup:"تنزيل نسخة احتياطية",restore:"استرجاع نسخة احتياطية",
+  reset_denied:"محاولة تصفير مرفوضة",reset_unauthorized:"محاولة تصفير غير مصرّح بها",
   create_item:"إنشاء صنف",update_item:"تعديل صنف",delete_item:"حذف صنف",
   import_items:"استيراد أصناف",export_items:"تصدير أصناف",
   create_maintenance_contract:"إنشاء عقد صيانة تلقائي",assign_whatsapp:"إرسال واتساب للفني",
@@ -703,7 +791,7 @@ function gmApprove(quotationId){
   q.status="gm_approved";q.updatedAt=nowISO();
   state.approvals.push({id:uid("ap"),quotationId:q.id,projectId:q.projectId,decision:"approved",by:u?u.username:"—",name:u?u.fullName:"—",date:today(),createdAt:nowISO()});
   var p=projectById(q.projectId);if(p){p.status="gm_approved";p.updatedAt=nowISO();}
-  q.items.forEach(function(it){state.material_issues.push({id:uid("mi"),quotationId:q.id,projectId:q.projectId,itemName:it.name,qtyOrdered:Number(it.qty),qtyIssued:0,issuedBy:null,date:null});});
+  q.items.forEach(function(it){state.material_issues.push({id:uid("mi"),quotationId:q.id,projectId:q.projectId,itemName:it.name,qtyOrdered:Number(it.qty),qtyIssued:0,issuedBy:null,date:null,createdAt:nowISO()});});
   /* عقد الصيانة التلقائي: إن كان العرض يشمل عقد صيانة، يُنشأ سجل عقد
      فور التعميد برقم متسلسل وحالة prepared ومصدر maintenance، فيظهر
      في شاشة العقود دون انتظار تجهيز السكرتارية. العقد وثيقة فقط —
@@ -785,7 +873,7 @@ function recordPayment(clientId,kind,amount,note,quotationId,skipAudit){
   var cl=clientById(clientId);if(!cl)return {error:"العميل غير موجود."};
   amount=Number(amount)||0;if(amount<=0)return {error:"أدخل مبلغاً أكبر من صفر."};
   if(kind!=="advance"&&kind!=="payment")kind="payment";
-  var c=counters();c.payment=(Number(c.payment)||0)+1;
+  var c=counters();c.payment=(Number(c.payment)||0)+1;c.updatedAt=nowISO();
   var pay={id:uid("py"),docNo:"PY-"+String(c.payment).padStart(4,"0"),clientId:cl.id,quotationId:quotationId||null,kind:kind,amount:amount,note:String(note||"").trim(),date:today(),by:state.user?state.user.username:"—",createdAt:nowISO()};
   state.payments.push(pay);if(!skipAudit)logAudit("record_payment","تسجيل "+(kind==="advance"?"دفعة مقدمة":"دفعة سداد")+" "+pay.docNo+" بمبلغ "+fmtM(amount)+" من العميل "+cl.name,pay.docNo,"الاعتماد المالي والمديونيات");save();return {payment:pay};
 }
@@ -1020,7 +1108,7 @@ function createMaterialReturn(quotationId,itemName,qty,note){
   var max=issued-returnedQtyForItem(quotationId,itemName);
   if(qty>max)return {error:"الكمية المرتجعة ("+qty+") أكبر من الكمية القابلة للإرجاع ("+max+") لهذه المادة."};
   var price=quoteItemPrice(q,itemName);
-  var c=counters();c["return"]=(Number(c["return"])||0)+1;
+  var c=counters();c["return"]=(Number(c["return"])||0)+1;c.updatedAt=nowISO();
   var ret={id:uid("mr"),docNo:"MR-"+String(c["return"]).padStart(4,"0"),quotationId:q.id,projectId:q.projectId,clientId:q.clientId,itemName:itemName,qty:qty,unitPrice:price,amount:Math.round(qty*price*100)/100,date:today(),by:state.user?state.user.username:"—",note:String(note||"").trim(),createdAt:nowISO()};
   state.material_returns.push(ret);
   /* المرتجع يعيد الكمية إلى رصيد الصنف في المخزون إن كان مسجلاً. */
@@ -1212,7 +1300,7 @@ function recordTransaction(kind,amount,category,method,description,clientId){
   amount=Number(amount)||0;
   if(kind!=="revenue"&&kind!=="expense")return {error:"نوع الحركة غير صحيح."};
   if(amount<=0)return {error:"أدخل مبلغاً أكبر من صفر."};
-  var c=counters();c.transaction=(Number(c.transaction)||0)+1;
+  var c=counters();c.transaction=(Number(c.transaction)||0)+1;c.updatedAt=nowISO();
   var tr={id:uid("tr"),docNo:"TR-"+String(c.transaction).padStart(4,"0"),kind:kind,amount:amount,category:String(category||"").trim()||(kind==="revenue"?"إيراد":"مصروف"),method:method==="بنك"?"بنك":"نقدي",description:String(description||"").trim(),clientId:clientId||null,date:today(),by:state.user?state.user.username:"—",createdAt:nowISO()};
   state.transactions.push(tr);
   if(kind==="revenue"&&clientId){
@@ -1263,13 +1351,14 @@ function saveSetupSettings(fields){
     if(String(fields.newCode).trim().length<4)return {error:"رمز التهيئة يجب أن يكون 4 أرقام على الأقل."};
     s.setupCode=String(fields.newCode).trim();
   }
+  s.updatedAt=nowISO();
   logAudit("save_setup","حفظ تهيئة النظام (بيانات الشركة والأرصدة الافتتاحية"+(fields.newCode?" وتغيير رمز التهيئة":"")+")","","الإعدادات");save();return {settings:s};
 }
 function screenAudit(){
   var f=auditFilters();
   var rows=filterAudit();
   var h='<div class="card"><h2>التقارير الرقابية</h2>'+
-  '<p class="muted">كل العمليات التي تمت في النظام من أي مستخدم، بالتاريخ والوقت — من تسجيل الدخول إلى الخروج. السجل محمي: لا يمكن حذف سجلاته من الواجهة، ولا يُشمل في النسخة الاحتياطية، ولا يُستبدل عند استرجاع نسخة، ولا يُمسح عند تصفير البيانات إلا بطلب صريح من المستخدم.</p>'+
+  '<p class="muted">كل العمليات التي تمت في النظام من أي مستخدم، بالتاريخ والوقت — من تسجيل الدخول إلى الخروج. السجل محمي: لا يمكن حذف سجلاته من الواجهة، ولا يُشمل في النسخة الاحتياطية، ولا يُستبدل عند استرجاع نسخة، ولا يُمسح إلا بزر «تصفير النظام» في الإعدادات (بطلب صريح من مدير النظام وبرمز التهيئة).</p>'+
   '<div class="form-grid">'+
   '<div><label>المستخدم</label><select id="afUser" class="inp"><option value="">— كل المستخدمين —</option>'+auditUsers().map(function(u){return '<option value="'+esc(u.username)+'"'+(f.user===u.username?" selected":"")+'>'+esc(u.fullName)+' ('+esc(u.username)+')</option>';}).join("")+'</select></div>'+
   '<div><label>نوع العملية</label><select id="afAction" class="inp"><option value="">— كل العمليات —</option>'+Object.keys(AUDIT_ACTIONS).map(function(k){return '<option value="'+k+'"'+(f.action===k?" selected":"")+'>'+esc(AUDIT_ACTIONS[k])+'</option>';}).join("")+'</select></div>'+
@@ -1315,6 +1404,85 @@ function sendTechnicianWhatsApp(projectId,technicianId){
   return r;
 }
 function setupCode(){var s=state.settings[0];return (s&&s.setupCode)?String(s.setupCode):"1805";}
+/* ---------- تصفير النظام (مدير النظام فقط، برمز التهيئة) ----------
+   الترتيب: (1) مسح الخادم عبر الـ API — كل المجموعات بما فيها سجل
+   التدقيق والإعدادات والعدادات — والمستخدمون أخيراً لأن مسحهم قد
+   يُبطل التوكن (401 بعدها نجاح متوقع)؛ (2) كتابة علامة التصفير على
+   الخادم (المجموعة reset_markers) وفي التخزين المحلي — هي ما يهزم
+   إعادة الرفع: أي صف أقدم منها يُسقط عند السحب والدفع والحفظ؛
+   (3) مسح المحلي (المفتاح الرئيسي + النسخة الاحتياطية + ميتا النسخة)
+   وإعادة الحالة إلى افتراضيات فارغة مع زرع حساب 1/1 من جديد عبر
+   ensureAdminUser، وتسجيل الخروج إلى شاشة الدخول. لا يمسّ أي جدول
+   آخر: الـ API يعمل على mshry_records فقط بـ companyId ثابت. */
+function resetSystem(code){
+  if(!state.user||state.user.role!=="admin"||state.user.username!=="1"){
+    logAudit("reset_unauthorized","محاولة تصفير مرفوضة: المستخدم «"+(state.user?state.user.username:"—")+"» ليس مدير النظام — التصفير لمدير النظام (الحساب 1) فقط.","","الإعدادات");
+    saveLocal();
+    return Promise.resolve({error:"تصفير النظام لمدير النظام فقط (الحساب 1)."});
+  }
+  if(!checkSetupCode(code)){
+    logAudit("reset_denied","محاولة تصفير مرفوضة: رمز تهيئة غير صحيح — لم يُمسح أي شيء.","","الإعدادات");
+    saveLocal();
+    return Promise.resolve({error:"رمز التهيئة غير صحيح — لم يتم مسح أي شيء."});
+  }
+  var at=new Date().toISOString();
+  var by=state.user.username;
+  function wipeServer(){
+    if(!(SYNC.mode==="server"&&SYNC.token))return Promise.resolve({serverWiped:false,serverErrors:[]});
+    var order=[];
+    SYNC_COLLECTIONS.forEach(function(pair){if(pair[0]!=="users"&&pair[0]!=="reset_markers")order.push(pair[0]);});
+    order.push("reset_markers","users");
+    var errors=[];
+    var chain=Promise.resolve();
+    order.forEach(function(coll){
+      chain=chain.then(function(){
+        return apiGet(coll).then(function(rows){
+          var c2=Promise.resolve();
+          (rows||[]).forEach(function(r){
+            c2=c2.then(function(){
+              return apiDel(coll,String(r.id)).catch(function(e){
+                if(e&&/401/.test(String(e.message||"")))return; /* إبطال متوقع بعد مسح المستخدمين */
+                errors.push(coll+":"+r.id);
+              });
+            });
+          });
+          return c2;
+        }).catch(function(e){
+          if(e&&/401/.test(String(e.message||"")))return;
+          errors.push(coll+":list");
+        });
+      });
+    });
+    return chain.then(function(){
+      return apiPost("reset_markers","last-reset",{id:"last-reset",at:at,by:by,companyId:COMPANY_ID}).catch(function(){/* قد يُبطل مسح المستخدمين التوكن — العلامة المحلية تحمي هذا المتصفح */});
+    }).then(function(){return {serverWiped:true,serverErrors:errors};});
+  }
+  return wipeServer().then(function(srv){
+    try{localStorage.removeItem(COMPANY_KEY);localStorage.removeItem(BKKEY);localStorage.removeItem(BKMETA);}catch(e){}
+    try{sessionStorage.removeItem("MSHRY_sync_token");}catch(e){}
+    SYNC.token=null;SYNC.resetAt=at;SYNC.lastSync=null;SYNC.pushFailed=0;
+    setResetMarker({at:at,by:by});
+    state=defState();state.user=null;state.screen="dashboard";state.ui={resetDone:true,resetAt:at};
+    state.settings[0].updatedAt=at;state.counters[0].updatedAt=at;
+    ensureAdminUser();
+    /* سجل التدقيق فارغ قصداً بعد التصفير (المسح شمله)؛ وعلامة
+       التصفير على الخادم وفي المحلي هي سجل العملية نفسها. */
+    saveLocal();
+    return {ok:true,at:at,serverWiped:srv.serverWiped,serverErrors:srv.serverErrors};
+  });
+}
+function resetSettingsHtml(){
+  var h='<div class="card" style="border:2px solid #b00020"><h3 style="color:#b00020">⚠ تصفير النظام</h3>'+
+  '<p class="warn">يمسح هذا الإجراء <b>جميع بيانات النظام نهائياً</b> من الخادم ومن هذا الجهاز ومن النسخة الاحتياطية المحلية: المستخدمون والعملاء والمشاريع والعروض والعقود والمواد والدفعات والإعدادات والعدادات وسجل التدقيق — ثم يعيد إنشاء حساب مدير النظام (1/1) تلقائياً في نظام فارغ. لا يمسّ أي نظام آخر، ولا يمكن التراجع بعد التأكيد.</p>';
+  if(state.ui.resetAsk){
+    h+='<div id="resetErr"></div><div class="form-grid"><div><label>رمز التهيئة (للتأكيد)</label><div class="pw-wrap"><input id="resetCodeIn" type="password" class="inp" placeholder="أدخل رمز التهيئة"><button type="button" class="eye" onclick="togglePwById(\'resetCodeIn\')" title="إظهار / إخفاء الرمز">👁</button></div></div></div>'+
+    '<div class="row" style="margin-top:.6rem"><button type="button" id="resetConfirmBtn" class="btn btn-navy" style="background:#b00020" onclick="doResetSystem()">تأكيد التصفير نهائياً — مسح كل شيء</button>'+
+    '<button type="button" class="btn btn-ghost" onclick="closeReset()">إلغاء</button></div>';
+  }else{
+    h+='<div class="row"><button type="button" class="btn btn-ghost" id="resetBtn" onclick="askReset()">تصفير النظام…</button></div>';
+  }
+  return h+'</div>';
+}
 function statementPrintHtml(clientId){
   var st=clientStatement(clientId);if(!st)return "";
   var s0=state.settings[0]||{};
@@ -1382,7 +1550,7 @@ function renderLogin(){
   '<div class="gold-bar"></div>'+
   '<h1>نظام إدارة مشاريع المقاولات</h1>'+
   '<p class="sub">تركيب كاميرات • صيانة • توريد أدوات سلامة • مضخات</p>'+
-  '<div id="loginErr" class="err hidden"></div>'+
+  '<div id="loginErr" class="err hidden"></div><div id="loginOk" class="hidden"></div>'+
   '<label for="loginUser">اسم المستخدم</label>'+
   '<input id="loginUser" class="inp" autocomplete="username" placeholder="اسم المستخدم" onkeydown="loginKey(event,\'user\')">'+
   '<label for="loginPass">كلمة المرور</label>'+
@@ -1397,6 +1565,8 @@ function renderLogin(){
      شاشة الدخول ثم تُمسح. */
   var sm=state.ui.sessionMsg;state.ui.sessionMsg=null;
   if(sm){var le=$("loginErr");if(le){le.textContent=sm;le.classList.remove("hidden");}}
+  var rd=null;try{rd=sessionStorage.getItem("MSHRY_reset_done");if(rd)sessionStorage.removeItem("MSHRY_reset_done");}catch(e){}
+  if(rd){var lo=$("loginOk");if(lo){lo.innerHTML='<div class="okbox">تم تصفير النظام بنجاح — النظام الآن فارغ تماماً. سجّل الدخول بحساب مدير النظام (1/1) للبدء من جديد.</div>';lo.classList.remove("hidden");}}
   var u=$("loginUser");if(u)try{u.focus();}catch(e){}
 }
 function navHtml(){
@@ -2156,6 +2326,7 @@ function screenSettings(){
   '<h3>قاعدة البيانات</h3><p>مفتاح التخزين المحلي: <b class="num">MSHRY_company</b> — النسخة الاحتياطية الواحدة: <b class="num">MSHRY_backup_company</b> — معرّف الشركة على الخادم: <b class="num">mshry-default</b> (منفصل تماماً عن أي نظام آخر على المشروع نفسه).</p>'+
   '<div class="row"><button type="button" class="btn btn-ghost" onclick="downloadBackup()">تنزيل نسخة احتياطية (JSON)</button>'+
   '<label class="btn btn-ghost" style="cursor:pointer">استعادة من ملف نسخة<input type="file" accept=".json" class="hidden" onchange="restoreBackup(this)"></label></div>'+
+  (isAdminUser()?resetSettingsHtml():"")+
   '<p class="warn">العمل دون اتصال (أوفلاين) مرحلة ثانية: حالياً يعمل النظام في الوضع المحلي عند غياب الخادم ويحفظ على هذا الجهاز، وتُعاد مزامنة الحفظ عند عودة الاتصال — أما العمل الكامل دون اتصال من عدة أجهزة ثم الدمج فليس في هذه النسخة.</p>';
   if(state.ui.setupAsk&&!state.ui.setupOpen){
     h+='<div class="card" style="border:2px solid var(--gold)"><h3>تهيئة النظام — أدخل الرمز</h3><div id="setupErr"></div>'+
@@ -2195,7 +2366,7 @@ function screenSettings(){
 }
 function doSaveSettings(){
   var s=state.settings[0];if(!s){state.settings=[{id:"main"}];s=state.settings[0];}
-  s.companyName=$("stName").value;s.currency=$("stCur").value;s.vatRate=Number($("stVat").value)||15;
+  s.companyName=$("stName").value;s.currency=$("stCur").value;s.vatRate=Number($("stVat").value)||15;s.updatedAt=nowISO();
   logAudit("save_settings","حفظ الإعدادات (اسم الشركة والعملة ونسبة الضريبة)","","الإعدادات");save();render();var m=$("setMsg");if(m)m.innerHTML='<div class="okbox">تم حفظ الإعدادات.</div>';
 }
 function downloadBackup(){
@@ -2228,6 +2399,7 @@ function restoreBackup(input){
 /* ---------- الإقلاع ---------- */
 function boot(){
   render();
+  var _mk0=getResetMarker();if(_mk0&&_mk0.at)SYNC.resetAt=_mk0.at;
   syncCheck().then(function(isServer){
     if(isServer&&SYNC.token){syncPullFromServer().then(function(){render();});}
   });
@@ -2261,6 +2433,9 @@ window.MSHRY={
   bankBalanceCalc:bankBalanceCalc,safeBalanceCalc:safeBalanceCalc,
   accountMovements:accountMovements,accMonthly:accMonthly,expenseBreakdown:expenseBreakdown,
   setupCode:setupCode,checkSetupCode:checkSetupCode,saveSetupSettings:saveSetupSettings,
+  resetSystem:resetSystem,doResetSystem:doResetSystem,askReset:askReset,closeReset:closeReset,
+  getResetMarker:getResetMarker,applyResetMarkerTo:applyResetMarkerTo,rowTime:rowTime,
+  RESET_KEY:RESET_KEY,RESET_COLL:RESET_COLL,
   printQuotation:printQuotation,printHtml:printHtml,quotePrintHtml:quotePrintHtml,
   waLinkForQuote:waLinkForQuote,sendQuoteWhatsApp:sendQuoteWhatsApp,
   buildTrialCSV:buildTrialCSV,buildStatementCSV:buildStatementCSV,
@@ -2294,6 +2469,20 @@ function applyRolePerms(role){
   document.querySelectorAll(".nuPerm").forEach(function(c){c.checked=state.ui.permInit.indexOf(c.value)>=0;});
 }
 function askSetup(){state.ui.setupAsk=true;state.ui.setupOpen=false;render();}
+function askReset(){state.ui.resetAsk=true;render();}
+function closeReset(){state.ui.resetAsk=false;render();}
+function doResetSystem(){
+  var code=$("resetCodeIn")?$("resetCodeIn").value:"";
+  var btn=$("resetConfirmBtn");if(btn)btn.disabled=true;
+  return resetSystem(code).then(function(r){
+    if(btn)btn.disabled=false;
+    if(r.error){var e=$("resetErr");if(e)e.innerHTML='<div class="err">'+esc(r.error)+'</div>';else if(typeof alert==="function")alert(r.error);return r;}
+    try{sessionStorage.setItem("MSHRY_reset_done",r.at);}catch(e2){}
+    if(typeof location!=="undefined"&&location&&typeof location.reload==="function"){try{location.reload();}catch(e3){render();}}
+    else{render();}
+    return r;
+  });
+}
 function backupSnapshot(){
   /* نسخة البيانات للتنزيل: سجل التدقيق لا يُشمل فيها أبداً — يبقى في
      النظام ولا يُسترجع من نسخة قديمة. */
