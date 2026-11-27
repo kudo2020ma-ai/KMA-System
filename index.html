@@ -178,11 +178,7 @@ footer{text-align:center;color:var(--muted);font-size:.85rem;padding:1rem}
    ============================================================ */
 var COMPANY_KEY="MSHRY_company";
 var COMPANY_ID="mshry-default";
-/* بيانات الشركة الافتراضية — مطابقة للترويسة الرسمية (letterhead.jpg) 100% */
 var COMPANY_DEFAULTS={companyName:"شركة بصمة المشاعر المتطورة",companyNameEn:"BASSMAT ALMASHAEIR ADVANCED COMPANY",commercialReg:"4031264916",address:"المملكة العربية السعودية — العزيزية، شارع عبدالله الخياط",phones:"0555645215 - 0125124905",email:"bassmat.co@gmail.com"};
-/* بيانات الشركة الفعلية: المخزنة في الإعدادات إن وُجدت، وإلا الافتراضية
-   المطابقة للترويسة. الاسم القديم «شركة المقاولات» يُعامل كغير مخصَّص. */
-function companyInfo(){var s=state.settings[0]||{};var o={};var k;for(k in COMPANY_DEFAULTS)o[k]=COMPANY_DEFAULTS[k];for(k in s)if(s[k]!==undefined&&s[k]!==null&&s[k]!=="")o[k]=s[k];if(o.companyName==="شركة المقاولات")o.companyName=COMPANY_DEFAULTS.companyName;return o;}
 var BKKEY="MSHRY_backup_company";
 var BKMETA="MSHRY_backup_meta_company";
 var ADMIN_USER="1";
@@ -203,19 +199,13 @@ var ROLES={
   hr:{name:"الموارد البشرية",label:"موارد بشرية"},
   secretariat:{name:"السكرتارية",label:"سكرتارية"}
 };
-/* الصلاحيات: ما الذي يراه كل دور افتراضياً.
-   مدير النظام: كل الشاشات بلا استثناء (بما فيها المستخدمون والإعدادات
-   وتهيئة النظام والتقارير الرقابية).
-   المدير العام: دور أعمال فقط — اعتماد العروض والتقارير ولوحات الإدارة؛
-   لا يملك افتراضياً إدارة المستخدمين ولا الإعدادات ولا التقارير الرقابية،
-   ولا تصل إليه أي صلاحية إضافية إلا إذا منحها له مدير النظام صراحةً
-   من شاشة المستخدمين. */
+/* الصلاحيات: ما الذي يراه كل دور */
 var ROLE_SCREENS={
   admin:["dashboard","projects","tasks","quotations","approvals","materials","returns","contracts","financial","accounts","reports","audit","users","employees","notifications","settings","items"],
   gm:["dashboard","projects","quotations","approvals","financial","accounts","reports","notifications","items"],
   projects_manager:["dashboard","projects","tasks","quotations","approvals","notifications","items"],
   technician:["tasks","notifications"],
-  accounts:["dashboard","materials","returns","financial","accounts","reports","notifications","items"],
+  accounts:["dashboard","materials","returns","financial","accounts","reports","notifications","items","users"],
   storekeeper:["materials","returns","notifications","items"],
   hr:["employees","notifications"],
   secretariat:["contracts","notifications"]
@@ -228,18 +218,14 @@ var SCREEN_TITLES={
   reports:"التقارير — ميزان المراجعة",audit:"التقارير الرقابية",users:"المستخدمون",employees:"الموظفون والإجازات",
   notifications:"الإشعارات",settings:"الإعدادات",items:"الأصناف"
 };
-/* الشاشات التي تظهر كخانات اختيار في صلاحيات المستخدم — كل الشاشات
-   بما فيها «التقارير الرقابية»: لا تُمنح إلا صراحةً من مدير النظام
-   (المدير العام لا يملكها افتراضياً)، وشاشة «المستخدمون» نفسها
-   لا يراها افتراضياً إلا مدير النظام. */
 var PERM_SCREENS=["dashboard","projects","tasks","quotations","approvals","materials","returns","contracts","financial","accounts","reports","audit","users","employees","notifications","settings","items"];
+var FULL_PERMS=PERM_SCREENS.slice();
 function $(id){return document.getElementById(id);}
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
 function today(){var d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
 function nowISO(){return new Date().toISOString();}
 function fmtM(n){n=Number(n)||0;return n.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fmtDate(s){return s?String(s).slice(0,10):"—";}
-function fmtDateTime(s){if(!s)return "—";var t=String(s);return t.slice(0,10)+" "+t.slice(11,19);}
 function uid(p){return (p||"id")+"-"+Date.now().toString(36)+"-"+Math.floor(Math.random()*1e6).toString(36);}
 function roleName(r){return ROLES[r]?ROLES[r].name:r;}
 function projectStatusLabel(s){return {"new":"جديد","assigned":"مُسند للفنيين","inspected":"تمت المعاينة","inspection_rejected":"معاينة مرفوضة","quoted":"عرض سعر","client_accepted":"قبل العميل","client_rejected":"رفض العميل","gm_approved":"معمّد","gm_rejected":"رفض التعميد","contracted":"العقد جاهز","issued":"المواد منصرفة","approved":"معتمد مالياً","completed":"مكتمل"}[s]||s;}
@@ -247,6 +233,9 @@ function quoteStatusLabel(s){return {"draft":"مسودة","sent":"مُرسل ل�
 function statusBadge(s,kind){var cls="b-draft";if(kind==="project"){cls={"new":"b-new","assigned":"b-assigned","inspected":"b-inspected","inspection_rejected":"b-rejected","quoted":"b-quoted","client_accepted":"b-accepted","client_rejected":"b-cancelled","gm_approved":"b-approved","gm_rejected":"b-rejected","contracted":"b-quoted","issued":"b-issued","approved":"b-approved","completed":"b-done"}[s]||"b-draft";}
 else{cls={"draft":"b-draft","sent":"b-sent","client_accepted":"b-accepted","client_rejected":"b-cancelled","cancelled":"b-cancelled","gm_approved":"b-approved","gm_rejected":"b-rejected","financial_approved":"b-approved"}[s]||"b-draft";}
 return '<span class="badge '+cls+'">'+esc(kind==="project"?projectStatusLabel(s):quoteStatusLabel(s))+'</span>';}
+
+function companyInfo(){var s=state.settings[0]||{};var o={};var k;for(k in COMPANY_DEFAULTS)o[k]=COMPANY_DEFAULTS[k];for(k in s)if(s[k]!==undefined&&s[k]!==null&&s[k]!=="")o[k]=s[k];if(o.companyName==="شركة المقاولات")o.companyName=COMPANY_DEFAULTS.companyName;return o;}
+function fmtDateTime(s){if(!s)return "—";var t=String(s);return t.slice(0,10)+" "+t.slice(11,19);}
 </script>
 <script>
 /* ---------- الحالة والتخزين المحلي ---------- */
@@ -286,29 +275,33 @@ function normalizeState(s){
 }
 var state=loadState();
 state.user=null;state.screen="dashboard";state.ui={};
-/* الحساب الافتراضي 1/1 هو «مدير النظام» (admin) بكل الصلاحيات —
-   وليس «المدير العام» (دور أعمال في الشركة). */
-function defaultAdminUser(){return {id:"u-1",username:"1",password:"1",fullName:"مدير النظام",role:"admin",phone:"",permissions:["dashboard","projects","tasks","quotations","approvals","materials","returns","contracts","financial","accounts","reports","audit","users","employees","notifications","settings","items"],companyId:COMPANY_ID,active:true,rev:1,createdAt:nowISO()};}
+function defaultAdminUser(){return {id:"u-1",username:"1",password:"1",fullName:"مدير النظام",role:"admin",phone:"",permissions:FULL_PERMS.slice(),companyId:COMPANY_ID,active:true,rev:1,createdAt:nowISO()};}
 function ensureAdminUser(){
   if(!Array.isArray(state.users))state.users=[];
   var found=null;
   for(var i=0;i<state.users.length;i++){if(state.users[i]&&state.users[i].username==="1"){found=state.users[i];break;}}
   if(!found){found=defaultAdminUser();state.users.unshift(found);return found;}
-  /* ترحيل حسابات قديمة: إن كان حساب "1" ما زال بدور «المدير العام»
-     (من نسخ سابقة) يُرفَّع إلى «مدير النظام» بكل الصلاحيات، وتُبطل
-     جلسته الحالية (rev+1) ليعيد الدخول بالدور الصحيح. */
-  if(found.role==="gm"){
-    found.role="admin";found.fullName="مدير النظام";
-    found.permissions=["dashboard","projects","tasks","quotations","approvals","materials","returns","contracts","financial","accounts","reports","audit","users","employees","notifications","settings","items"];
-    found.rev=(Number(found.rev)||1)+1;
-  }
+  /* إصلاح ذاتي لا يمكن تجاوزه (فكّ الحبس): حساب «1» هو مدير النظام
+     دائماً — مهما حُفظ عليه سابقاً (دور آخر كالحسابات أو المدير العام،
+     أو صلاحيات مخفّضة، أو اسم مختلف، أو إيقاف)، يُستعاد عند كل تشغيل
+     (محلياً وبعد المزامنة من الخادم) إلى: دور admin، والاسم الكامل
+     «مدير النظام»، وكل الصلاحيات (17/17)، والحساب مفعّل. أي إصلاح
+     يرفع rev فيُبطل الجلسات القديمة (فيعيد مدير النظام الدخول
+     بالصلاحيات الكاملة)، ويُسجَّل طابع updatedAt حتى يفوز السجل
+     المُصلح في دمج المزامنة على نسخة الخادم المخفّضة. كلمة المرور
+     لا تُمسّ إطلاقاً — لا تُستعاد ولا تُغيَّر. */
+  var changed=false;
+  if(found.role!=="admin"){found.role="admin";changed=true;}
+  if(found.fullName!=="مدير النظام"){found.fullName="مدير النظام";changed=true;}
+  if(found.active===false){found.active=true;changed=true;}
+  if(!Array.isArray(found.permissions)||found.permissions.length!==FULL_PERMS.length||FULL_PERMS.some(function(s){return found.permissions.indexOf(s)<0;})){found.permissions=FULL_PERMS.slice();changed=true;}
+  if(changed){found.rev=(Number(found.rev)||1)+1;found.updatedAt=nowISO();}
   if(typeof found.rev!=="number"||isNaN(found.rev))found.rev=1;
   return found;
 }
-/* يُزرع مدير النظام 1/1 فقط عند غياب حساب "1" تماماً. إن وُجد — حتى بعد
-   تغيير كلمة مروره أو إيقافه — لا يُمسّ إطلاقاً (ولا يُستعاد الرمز
-   القديم عند أي إعادة تحميل). */
-ensureAdminUser();
+/* يُزرع المدير 1/1 فقط عند غياب حساب "1" تماماً. إن وُجد — حتى بعد تغيير
+   كلمة مروره أو إيقافه — لا يُمسّ إطلاقاً. */
+ensureAdminUser();saveLocal();
 function saveLocal(){try{var j=JSON.stringify(state);localStorage.setItem(COMPANY_KEY,j);localStorage.setItem(BKKEY,j);localStorage.setItem(BKMETA,new Date().toISOString());}catch(e){}}
 function save(){saveLocal();scheduleSyncPush();}
 function counters(){if(!state.counters||!state.counters.length)state.counters=[{id:"main",project:0,quotation:0,contract:0,payment:0,client:0,"return":0,transaction:0,item:0}];return state.counters[0];}
@@ -341,9 +334,9 @@ function syncSetBadge(){
 }
 function syncNote(){
   var n=$("loginModeNote");if(!n)return;
-  if(SYNC.mode==="server"){n.textContent="متصل بالخادم: بيانات الشركة محفوظة مركزياً في قاعدة البيانات الواحدة المشتركة، وتظهر على جميع الأجهزة بعد الدخول بنفس الحساب. إنشاء المستخدمين يكون من داخل النظام عبر شاشة المستخدمين وبواسطة مدير النظام فقط.";}
-  else if(SYNC.serverMode==="local-json"){n.textContent="تنبيه: قاعدة بيانات الخادم المشتركة غير متصلة بعد — الخادم يعمل بوضع التخزين المحلي المؤقت الذي لا يحفظ بين الطلبات، فالبيانات محفوظة على هذا الجهاز فقط الآن ولن تظهر على جهاز آخر. إنشاء المستخدمين يكون من داخل النظام عبر شاشة المستخدمين وبواسطة مدير النظام فقط.";}
-  else{n.textContent="إنشاء المستخدمين يكون من داخل النظام عبر شاشة المستخدمين وبواسطة مدير النظام فقط — لا يوجد تسجيل من شاشة الدخول.";}
+  if(SYNC.mode==="server"){n.textContent="متصل بالخادم: بيانات الشركة محفوظة مركزياً في قاعدة البيانات الواحدة المشتركة، وتظهر على جميع الأجهزة بعد الدخول بنفس الحساب. إنشاء المستخدمين يكون من داخل النظام عبر شاشة المستخدمين وبواسطة مدير النظام أو الحسابات.";}
+  else if(SYNC.serverMode==="local-json"){n.textContent="تنبيه: قاعدة بيانات الخادم المشتركة غير متصلة بعد — الخادم يعمل بوضع التخزين المحلي المؤقت الذي لا يحفظ بين الطلبات، فالبيانات محفوظة على هذا الجهاز فقط الآن ولن تظهر على جهاز آخر. إنشاء المستخدمين يكون من داخل النظام عبر شاشة المستخدمين وبواسطة مدير النظام أو الحسابات.";}
+  else{n.textContent="إنشاء المستخدمين يكون من داخل النظام عبر شاشة المستخدمين وبواسطة مدير النظام أو الحسابات — لا يوجد تسجيل من شاشة الدخول.";}
 }
 function syncCheck(){
   if(typeof fetch!=="function"){SYNC.checked=true;syncSetBadge();return Promise.resolve(false);}
@@ -403,8 +396,17 @@ function syncPullFromServer(){
       var merged=syncMergeRows(local,res.rows);
       if(JSON.stringify(merged)!==JSON.stringify(local)){state[res.key]=merged;changed=true;}
     });
+    /* الإصلاح الذاتي لحساب «1» بعد المزامنة: إن أصلح ensureAdminUser
+       السجل (أو زرعه لعدم وجوده) يُدفع فوراً إلى الخادم عبر save()
+       حتى لا تعيده مزامنة لاحقة إلى النسخة المخفّضة المحفوظة هناك؛
+       أما التغييرات العادية فتُحفظ محلياً فقط كما كانت. */
+    var admBefore=findLocalUser("1");
+    var admRevBefore=admBefore?Number(admBefore.rev||1):null;
     ensureAdminUser();
-    if(changed)saveLocal();
+    var admAfter=findLocalUser("1");
+    var adminRepaired=!!(admAfter&&(admRevBefore===null||Number(admAfter.rev||1)!==admRevBefore));
+    if(adminRepaired){save();}
+    else if(changed){saveLocal();}
     SYNC.lastSync=new Date().toISOString();SYNC.busy=false;syncSetBadge();
     /* إن كان الخادم فارغاً تماماً والمحلي فيه بيانات: تُدفع البيانات المحلية إلى الخادم */
     if(serverEmptyEverywhere&&localHasData){return syncPushNow().then(function(){return true;});}
@@ -509,45 +511,9 @@ function logout(){
   if(state.user){logAudit("logout","تسجيل خروج المستخدم "+(state.user.fullName||state.user.username)+" ("+state.user.username+")","","الدخول");saveLocal();if(SYNC.mode==="server"&&SYNC.token)syncPushNow();}
   state.user=null;state.screen="dashboard";try{sessionStorage.removeItem("MSHRY_sync_token");}catch(e){}SYNC.token=null;render();
 }
-/* ---------- سريان تعديل المستخدم فوراً (rev) ----------
-   كل مستخدم يحمل رقم نسخة rev يزيد عند أي تعديل عليه (اسم مستخدم،
-   كلمة مرور، دور، صلاحيات، إيقاف/تفعيل). لقطة الجلسة state.user تحفظ
-   الـ rev لحظة الدخول، وعند كل عرض (render) تُقارن بالسجل الحالي:
-   - السجل محذوف أو موقوف → خروج إجباري.
-   - الـ rev تغيّر (عدّله مدير النظام من جهاز آخر أو من هذه الجلسة) →
-     خروج إجباري وإعادة دخول بالبيانات الجديدة؛ فلا يبقى رمز قديم
-     ولا صلاحيات قديمة سارية أبداً. يعمل أيضاً بعد مزامنة من الخادم. */
-function forceLogout(msg){
-  if(state.user){try{logAudit("logout","تسجيل خروج إجباري للمستخدم "+(state.user.fullName||state.user.username)+" ("+state.user.username+") — "+msg,"","الدخول");}catch(e){}}
-  state.user=null;state.screen="dashboard";state.ui.sessionMsg=msg;
-  try{sessionStorage.removeItem("MSHRY_sync_token");}catch(e){}SYNC.token=null;saveLocal();
-}
-function validateSession(){
-  var u=state.user;if(!u)return true;
-  var full=userById(u.id);
-  if(!full){forceLogout("حُذف حسابك من النظام — سجّل الدخول مجدداً.");return false;}
-  if(full.active===false){forceLogout("أُوقف حسابك — راجع مدير النظام.");return false;}
-  if(Number(full.rev||1)!==Number(u.rev||1)){forceLogout("أُجري تعديل على حسابك (اسم المستخدم أو كلمة المرور أو الدور أو الصلاحيات) — سجّل الدخول مجدداً بالبيانات الجديدة.");return false;}
-  return true;
-}
 function currentUser(){return state.user;}
-/* الصلاحيات الفعلية للمستخدم: مدير النظام يرى كل الشاشات دائماً؛
-   غيره يرى قائمة permissions الخاصة به إن كانت مصفوفة، وإلا
-   افتراضي دوره من ROLE_SCREENS. المدير العام لا يملك افتراضياً
-   (المستخدمون/الإعدادات/التقارير الرقابية) إلا بمنح صريح من
-   مدير النظام. السجل الكامل للمستخدم (وفيه permissions) يُقرأ
-   من state.users لأن state.user نسخة مختصرة. */
-function userScreens(u){
-  if(!u)return [];
-  if(u.role==="admin")return Object.keys(SCREEN_TITLES);
-  var full=userById(u.id);
-  if(full&&Array.isArray(full.permissions))return full.permissions;
-  return ROLE_SCREENS[u.role]||[];
-}
 function canSee(screen){var u=state.user;if(!u)return false;return userScreens(u).indexOf(screen)>=0;}
 function canPrice(){var u=state.user;if(!u)return false;return u.role!=="technician"&&u.role!=="hr";}
-/* التعميد الإلكتروني صلاحية «المدير العام» أصلاً؛ ومدير النظام يملكها
-   أيضاً باعتباره صاحب كل الصلاحيات بلا استثناء. */
 function isGM(){return state.user&&(state.user.role==="gm"||state.user.role==="admin");}
 function isAccounts(){return state.user&& (state.user.role==="accounts"||state.user.role==="gm"||state.user.role==="admin");}
 function notify(targetUserId,targetRole,title,body,refs){
@@ -564,12 +530,11 @@ function myNotifications(){
     return false;
   });
 }
-/* ---------- سجل التدقيق (التقارير الرقابية) ----------
-   كل عملية في النظام تُسجَّل تلقائياً مع التاريخ والوقت والمستخدم.
-   السجل محمي: لا زر حذف لسجلاته في الواجهة، ولا يُشمل في النسخة
-   الاحتياطية، ولا يُستبدل عند استرجاع نسخة (يبقى كما هو ويُضاف إليه
-   حدث الاسترجاع نفسه)، ولا يُمسح عند تصفير البيانات إلا بطلب صريح
-   من المستخدم. يُزامَن مع الخادم كمجموعة audit_log كباقي المجموعات. */
+function clientById(id){for(var i=0;i<state.clients.length;i++)if(String(state.clients[i].id)===String(id))return state.clients[i];return null;}
+function projectById(id){for(var i=0;i<state.projects.length;i++)if(String(state.projects[i].id)===String(id))return state.projects[i];return null;}
+function quoteById(id){for(var i=0;i<state.quotations.length;i++)if(String(state.quotations[i].id)===String(id))return state.quotations[i];return null;}
+function userById(id){for(var i=0;i<state.users.length;i++)if(String(state.users[i].id)===String(id))return state.users[i];return null;}
+
 var AUDIT_ACTIONS={
   login_success:"تسجيل دخول",login_failed:"محاولة دخول فاشلة",logout:"تسجيل خروج",
   create_client:"إنشاء عميل",create_project:"إنشاء مشروع",delete_project:"حذف مشروع",
@@ -581,23 +546,28 @@ var AUDIT_ACTIONS={
   issue_material:"صرف مواد",prepare_contract:"تجهيز عقد",financial_approve:"الاعتماد المالي",
   record_payment:"تسجيل دفعة",set_opening:"تعديل رصيد افتتاحي",create_return:"مرتجع مواد",
   record_transaction:"تسجيل حركة حسابات",create_user:"إنشاء مستخدم",update_user:"تعديل مستخدم",
-  delete_user:"حذف مستخدم",save_settings:"حفظ الإعدادات",save_setup:"حفظ تهيئة النظام",
+  delete_user:"حذف مستخدم",create_user_denied:"محاولة إنشاء مستخدم مرفوضة",update_user_denied:"محاولة تعديل مستخدم مرفوضة",delete_user_denied:"محاولة حذف مستخدم مرفوضة",save_settings:"حفظ الإعدادات",save_setup:"حفظ تهيئة النظام",
   backup:"تنزيل نسخة احتياطية",restore:"استرجاع نسخة احتياطية",
   create_item:"إنشاء صنف",update_item:"تعديل صنف",delete_item:"حذف صنف",
   import_items:"استيراد أصناف",export_items:"تصدير أصناف",
   create_maintenance_contract:"إنشاء عقد صيانة تلقائي",assign_whatsapp:"إرسال واتساب للفني",
   update_permissions:"تغيير صلاحيات مستخدم",print_quotation:"طباعة عرض سعر",print_report:"طباعة تقرير رقابي"
 };
+var SITE_URL="https://kma-system.vercel.app";
 function auditActionLabel(a){return AUDIT_ACTIONS[a]||a;}
-function auditRoleLabel(r){return r==="system"?"النظام":roleName(r);}
-/* عرض المستخدم في سجل التدقيق: يُحلّ الاسم الحالي من سجل المستخدم
-   (بالمعرّف) حتى بعد تغيير اسم المستخدم؛ وإن حُذف المستخدم أو كان
-   الحدث قديماً بلا معرّف، يُعرض الاسم المحفوظ وقت الحدث. */
 function auditDisplayUser(e){
   var full=e&&e.userId?userById(e.userId):null;
   if(full)return {username:full.username,fullName:full.fullName||full.username,role:full.role};
   return {username:e?e.username:"—",fullName:e?(e.fullName||e.username):"—",role:e?e.role:"system"};
 }
+function auditRoleLabel(r){return r==="system"?"النظام":roleName(r);}
+function callerIsNonAdmin(){return !!(state.user&&state.user.role!=="admin");}
+function forceLogout(msg){
+  if(state.user){try{logAudit("logout","تسجيل خروج إجباري للمستخدم "+(state.user.fullName||state.user.username)+" ("+state.user.username+") — "+msg,"","الدخول");}catch(e){}}
+  state.user=null;state.screen="dashboard";state.ui.sessionMsg=msg;
+  try{sessionStorage.removeItem("MSHRY_sync_token");}catch(e){}SYNC.token=null;saveLocal();
+}
+function isAdminUser(){return !!(state.user&&state.user.role==="admin");}
 function logAudit(action,summary,docNo,screen,who){
   var u=who||state.user;
   /* userId يُحفظ مع كل حدث حتى يعرض سجل التدقيق الاسم الحالي للمستخدم
@@ -608,10 +578,21 @@ function logAudit(action,summary,docNo,screen,who){
   state.audit_log.push(e);
   return e;
 }
-function clientById(id){for(var i=0;i<state.clients.length;i++)if(String(state.clients[i].id)===String(id))return state.clients[i];return null;}
-function projectById(id){for(var i=0;i<state.projects.length;i++)if(String(state.projects[i].id)===String(id))return state.projects[i];return null;}
-function quoteById(id){for(var i=0;i<state.quotations.length;i++)if(String(state.quotations[i].id)===String(id))return state.quotations[i];return null;}
-function userById(id){for(var i=0;i<state.users.length;i++)if(String(state.users[i].id)===String(id))return state.users[i];return null;}
+function userScreens(u){
+  if(!u)return [];
+  if(u.role==="admin")return Object.keys(SCREEN_TITLES);
+  var full=userById(u.id);
+  if(full&&Array.isArray(full.permissions))return full.permissions;
+  return ROLE_SCREENS[u.role]||[];
+}
+function validateSession(){
+  var u=state.user;if(!u)return true;
+  var full=userById(u.id);
+  if(!full){forceLogout("حُذف حسابك من النظام — سجّل الدخول مجدداً.");return false;}
+  if(full.active===false){forceLogout("أُوقف حسابك — راجع مدير النظام.");return false;}
+  if(Number(full.rev||1)!==Number(u.rev||1)){forceLogout("أُجري تعديل على حسابك (اسم المستخدم أو كلمة المرور أو الدور أو الصلاحيات) — سجّل الدخول مجدداً بالبيانات الجديدة.");return false;}
+  return true;
+}
 </script>
 <script>
 /* ---------- منطق العمل ---------- */
@@ -812,420 +793,6 @@ function setOpeningBalance(clientId,amount){
   var cl=clientById(clientId);if(!cl)return {error:"العميل غير موجود."};
   cl.openingBalance=Number(amount)||0;cl.updatedAt=nowISO();logAudit("set_opening","تعديل الرصيد الافتتاحي للعميل "+cl.name+" إلى "+fmtM(Number(amount)||0),"","التقارير — ميزان المراجعة");save();return {client:cl};
 }
-/* ---------- مرتجع المواد ---------- */
-function returnsForQuotation(qid){return state.material_returns.filter(function(r){return String(r.quotationId)===String(qid);});}
-function returnsTotalForQuotation(qid){var t=0;returnsForQuotation(qid).forEach(function(r){t+=Number(r.amount)||0;});return Math.round(t*100)/100;}
-function returnedQtyForItem(qid,itemName){var q=0;returnsForQuotation(qid).forEach(function(r){if(String(r.itemName)===String(itemName))q+=Number(r.qty)||0;});return q;}
-function quoteItemPrice(q,itemName){if(!q||!q.items)return 0;for(var i=0;i<q.items.length;i++)if(String(q.items[i].name)===String(itemName))return Number(q.items[i].price)||0;return 0;}
-/* مرتجع مواد منصرفة: يُسمح فقط للعروض المعتمدة مالياً (التي سُجلت مديونيتها).
-   الكمية المرتجعة لا تتجاوز المنصرف منها مطروحاً منه ما سبق إرجاعه، وقيمتها
-   تُحسب بسعر الوحدة في العرض، وتُخصم من مديونية العميل في ميزان المراجعة
-   وكشف الحساب التحليلي، وتظهر في العرض نفسه. */
-function createMaterialReturn(quotationId,itemName,qty,note){
-  var q=quoteById(quotationId);if(!q)return {error:"العرض غير موجود."};
-  if(q.status!=="financial_approved")return {error:"المرتجع متاح فقط للعروض المعتمدة مالياً (التي سُجلت مديونيتها)."};
-  itemName=String(itemName||"").trim();qty=Number(qty)||0;
-  if(!itemName)return {error:"اختر المادة."};
-  if(qty<=0)return {error:"أدخل كمية مرتجعة أكبر من صفر."};
-  var issued=0;state.material_issues.forEach(function(m){if(String(m.quotationId)===String(quotationId)&&String(m.itemName)===String(itemName))issued+=Number(m.qtyIssued)||0;});
-  var max=issued-returnedQtyForItem(quotationId,itemName);
-  if(qty>max)return {error:"الكمية المرتجعة ("+qty+") أكبر من الكمية القابلة للإرجاع ("+max+") لهذه المادة."};
-  var price=quoteItemPrice(q,itemName);
-  var c=counters();c["return"]=(Number(c["return"])||0)+1;
-  var ret={id:uid("mr"),docNo:"MR-"+String(c["return"]).padStart(4,"0"),quotationId:q.id,projectId:q.projectId,clientId:q.clientId,itemName:itemName,qty:qty,unitPrice:price,amount:Math.round(qty*price*100)/100,date:today(),by:state.user?state.user.username:"—",note:String(note||"").trim(),createdAt:nowISO()};
-  state.material_returns.push(ret);
-  /* المرتجع يعيد الكمية إلى رصيد الصنف في المخزون إن كان مسجلاً. */
-  var _rit=itemByName(itemName);
-  if(_rit){_rit.qty=Number(_rit.qty||0)+qty;_rit.updatedAt=nowISO();}
-  logAudit("create_return","مرتجع مواد "+ret.docNo+": "+itemName+" ×"+qty+" بقيمة "+fmtM(ret.amount)+" — تخفيض مديونية العميل",ret.docNo,"مرتجع المواد");save();return {ret:ret};
-}
-/* ---------- إدارة الحسابات: الإيرادات والمصروفات والحركات ---------- */
-function materialCostTotal(){
-  var t=0;
-  state.material_issues.forEach(function(m){
-    var q=quoteById(m.quotationId);if(!q||q.status!=="financial_approved")return;
-    t+=(Number(m.qtyIssued)||0)*quoteItemPrice(q,m.itemName);
-  });
-  return Math.round(t*100)/100;
-}
-/* الإيراد المسجل من عميل يُحفظ أيضاً كدفعة في payments (paymentDocNo)،
-   فيُحسب مرة واحدة فقط هنا وفي كل التجميعات — يُستثنى من تكرار الحساب. */
-function isCountedRevenue(tr){return tr.kind==="revenue"&&tr.paymentDocNo;}
-function revenueTotal(){
-  var t=0;state.payments.forEach(function(p){t+=Number(p.amount)||0;});
-  state.transactions.forEach(function(tr){if(tr.kind==="revenue"&&!isCountedRevenue(tr))t+=Number(tr.amount)||0;});
-  return Math.round(t*100)/100;
-}
-function expenseTotal(){
-  var t=materialCostTotal();
-  state.transactions.forEach(function(tr){if(tr.kind==="expense")t+=Number(tr.amount)||0;});
-  return Math.round(t*100)/100;
-}
-function bankBalanceCalc(){
-  var s=state.settings[0]||{};
-  var b=Number(s.bankBalance)||0;
-  state.transactions.forEach(function(tr){if(tr.method==="بنك"&&!isCountedRevenue(tr)){if(tr.kind==="revenue")b+=Number(tr.amount)||0;else b-=Number(tr.amount)||0;}});
-  return Math.round(b*100)/100;
-}
-function safeBalanceCalc(){
-  var s=state.settings[0]||{};
-  var b=Number(s.safeBalance)||0;
-  state.payments.forEach(function(p){b+=Number(p.amount)||0;});
-  state.transactions.forEach(function(tr){if(tr.method!=="بنك"&&!isCountedRevenue(tr)){if(tr.kind==="revenue")b+=Number(tr.amount)||0;else b-=Number(tr.amount)||0;}});
-  b-=materialCostTotal();
-  return Math.round(b*100)/100;
-}
-/* تسجيل إيراد/مصروف. الإيراد المرتبط بعميل يُسجَّل أيضاً دفعة سداد على
-   العميل فينعكس في ميزان المراجعة وكشف حسابه (تخفيض مديونيته). */
-function recordTransaction(kind,amount,category,method,description,clientId){
-  amount=Number(amount)||0;
-  if(kind!=="revenue"&&kind!=="expense")return {error:"نوع الحركة غير صحيح."};
-  if(amount<=0)return {error:"أدخل مبلغاً أكبر من صفر."};
-  var c=counters();c.transaction=(Number(c.transaction)||0)+1;
-  var tr={id:uid("tr"),docNo:"TR-"+String(c.transaction).padStart(4,"0"),kind:kind,amount:amount,category:String(category||"").trim()||(kind==="revenue"?"إيراد":"مصروف"),method:method==="بنك"?"بنك":"نقدي",description:String(description||"").trim(),clientId:clientId||null,date:today(),by:state.user?state.user.username:"—",createdAt:nowISO()};
-  state.transactions.push(tr);
-  if(kind==="revenue"&&clientId){
-    var pr=recordPayment(clientId,"payment",amount,description||"إيراد مسجل من إدارة الحسابات",null,true);
-    if(pr.error){state.transactions.pop();return pr;}
-    tr.paymentDocNo=pr.payment.docNo;
-  }
-  logAudit("record_transaction","تسجيل "+(kind==="revenue"?"إيراد":"مصروف")+" "+tr.docNo+" بمبلغ "+fmtM(amount)+" — "+tr.category,tr.docNo,"إدارة الحسابات");save();return {transaction:tr};
-}
-function accountMovements(){
-  var moves=[];
-  state.payments.forEach(function(p){moves.push({date:p.date,doc:p.docNo,desc:"دفعة من العميل "+((clientById(p.clientId)||{}).name||"")+(p.note?" — "+p.note:""),category:p.kind==="advance"?"دفعة مقدمة":"دفعة سداد",method:"نقدي",kind:"revenue",amount:Number(p.amount)||0});});
-  state.material_issues.forEach(function(m){
-    var q=quoteById(m.quotationId);if(!q||q.status!=="financial_approved")return;
-    var qty=Number(m.qtyIssued)||0;if(qty<=0)return;
-    moves.push({date:m.date||String(q.financialApprovedAt||"").slice(0,10),doc:q.number,desc:"تكلفة مواد منصرفة — "+m.itemName,category:"مواد",method:"نقدي",kind:"expense",amount:Math.round(qty*quoteItemPrice(q,m.itemName)*100)/100});
-  });
-  state.transactions.forEach(function(tr){
-    if(isCountedRevenue(tr))return;
-    moves.push({date:tr.date,doc:tr.docNo,desc:tr.description||tr.category,category:tr.category,method:tr.method,kind:tr.kind,amount:Number(tr.amount)||0});
-  });
-  state.material_returns.forEach(function(r){moves.push({date:r.date,doc:r.docNo,desc:"مرتجع مواد — "+r.itemName+" ×"+r.qty+" (تخفيض مديونية "+fmtM(r.amount)+")",category:"مرتجع مواد",method:"—",kind:"return",amount:Number(r.amount)||0});});
-  moves.sort(function(a,b){return String(b.date).localeCompare(String(a.date));});
-  return moves;
-}
-function monthKey(d){return String(d||"").slice(0,7);}
-function monthLabel(ym){var parts=String(ym).split("-");var months=["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];var m=Number(parts[1]);return (months[m-1]||"")+" "+(parts[0]||"");}
-function accMonthly(){
-  var map={};
-  function add(ym,rev,exp){if(!ym||ym.length<7)return;if(!map[ym])map[ym]={rev:0,exp:0};map[ym].rev+=rev;map[ym].exp+=exp;}
-  state.payments.forEach(function(p){add(monthKey(p.date),Number(p.amount)||0,0);});
-  state.transactions.forEach(function(tr){if(isCountedRevenue(tr))return;if(tr.kind==="revenue")add(monthKey(tr.date),Number(tr.amount)||0,0);else add(monthKey(tr.date),0,Number(tr.amount)||0);});
-  state.material_issues.forEach(function(m){var q=quoteById(m.quotationId);if(!q||q.status!=="financial_approved")return;var qty=Number(m.qtyIssued)||0;if(qty>0)add(monthKey(m.date||String(q.financialApprovedAt||"").slice(0,10)),0,qty*quoteItemPrice(q,m.itemName));});
-  var keys=Object.keys(map).sort();
-  return keys.map(function(k){return {ym:k,label:monthLabel(k),rev:Math.round(map[k].rev*100)/100,exp:Math.round(map[k].exp*100)/100,net:Math.round((map[k].rev-map[k].exp)*100)/100};});
-}
-function expenseBreakdown(){
-  var cats={};
-  var mat=materialCostTotal();if(mat>0)cats["مواد منصرفة"]=mat;
-  state.transactions.forEach(function(tr){if(tr.kind==="expense"){var c2=tr.category||"مصروفات أخرى";cats[c2]=((cats[c2]||0)+Number(tr.amount)||0);}});
-  var total=0;Object.keys(cats).forEach(function(k){total+=cats[k];});
-  var rows=Object.keys(cats).map(function(k){return {name:k,amount:Math.round(cats[k]*100)/100,pct:total>0?Math.round(cats[k]/total*1000)/10:0};});
-  rows.sort(function(a,b){return b.amount-a.amount;});
-  return {rows:rows,total:Math.round(total*100)/100};
-}
-/* ---------- تهيئة النظام برمز ---------- */
-function setupCode(){var s=state.settings[0];return (s&&s.setupCode)?String(s.setupCode):"1805";}
-function checkSetupCode(code){return String(code||"").trim()===setupCode();}
-function saveSetupSettings(fields){
-  var s=state.settings[0];if(!s){state.settings=[{id:"main"}];s=state.settings[0];}
-  if(fields.companyName!==undefined)s.companyName=String(fields.companyName);
-  if(fields.companyNameEn!==undefined)s.companyNameEn=String(fields.companyNameEn);
-  if(fields.commercialReg!==undefined)s.commercialReg=String(fields.commercialReg);
-  if(fields.address!==undefined)s.address=String(fields.address);
-  if(fields.phones!==undefined)s.phones=String(fields.phones);
-  if(fields.email!==undefined)s.email=String(fields.email);
-  if(fields.currency!==undefined)s.currency=String(fields.currency);
-  if(fields.vatRate!==undefined)s.vatRate=Number(fields.vatRate)||15;
-  if(fields.bankBalance!==undefined)s.bankBalance=Number(fields.bankBalance)||0;
-  if(fields.safeBalance!==undefined)s.safeBalance=Number(fields.safeBalance)||0;
-  if(fields.ownerName!==undefined)s.ownerName=String(fields.ownerName);
-  if(fields.ownerPhone!==undefined)s.ownerPhone=String(fields.ownerPhone);
-  if(fields.taxNumber!==undefined)s.taxNumber=String(fields.taxNumber);
-  if(fields.city!==undefined)s.city=String(fields.city);
-  if(fields.district!==undefined)s.district=String(fields.district);
-  if(fields.street!==undefined)s.street=String(fields.street);
-  if(fields.buildingNo!==undefined)s.buildingNo=String(fields.buildingNo);
-  if(fields.postalCode!==undefined)s.postalCode=String(fields.postalCode);
-  if(fields.subNumber!==undefined)s.subNumber=String(fields.subNumber);
-  if(fields.newCode!==undefined&&String(fields.newCode).trim()){
-    if(String(fields.newCode).trim().length<4)return {error:"رمز التهيئة يجب أن يكون 4 أرقام على الأقل."};
-    s.setupCode=String(fields.newCode).trim();
-  }
-  logAudit("save_setup","حفظ تهيئة النظام (بيانات الشركة والأرصدة الافتتاحية"+(fields.newCode?" وتغيير رمز التهيئة":"")+")","","الإعدادات");save();return {settings:s};
-}
-/* ---------- الطباعة والتصدير ---------- */
-function printHtml(html){
-  var area=document.getElementById("printArea");
-  if(!area){area=document.createElement("div");area.id="printArea";document.body.appendChild(area);}
-  area.innerHTML=html;
-  if(typeof window!=="undefined"&&typeof window.print==="function"){try{window.print();}catch(e){}}
-  return area.innerHTML;
-}
-/* ---------- الطباعة على الترويسة الرسمية ---------- */
-/* تقسيم صفوف الجدول على صفحات A4: كل صفحة ترويسة كاملة، ورأس الجدول
-   يتكرر في كل صفحة، والصفوف لا تنقسم، والتذييل (الإجماليات/التواقيع)
-   يبقى معاً في الصفحة الأخيرة — تُحجز له مساحة بإنقاص صفوف الصفحة الأخيرة. */
-function paginateRows(rows,perPage,footRows){
-  var pages=[];var cur=[];
-  rows.forEach(function(r){cur.push(r);if(cur.length>=perPage){pages.push(cur);cur=[];}});
-  if(cur.length)pages.push(cur);
-  if(!pages.length)pages.push([]);
-  if(footRows&&pages.length){
-    var last=pages[pages.length-1];
-    if(last.length>perPage-footRows){var mv=last.splice(perPage-footRows);pages.push(mv);}
-  }
-  return pages;
-}
-function letterheadPage(inner,pageNo,totalPages,continued,dense){
-  var h='<div class="print-page"><div class="print-content'+(dense?" dense":"")+'">';
-  if(pageNo>1&&continued)h+='<p class="cont-line">'+esc(continued)+' — صفحة '+pageNo+' من '+totalPages+'</p>';
-  h+=inner+'</div></div>';
-  return h;
-}
-/* أعمدة عرض السعر كما في النموذج: الرقم، بيان الأعمال (50% — الأهم)،
-   الوحدة، الكمية، السعر الإفرادي 12%، السعر الإجمالي 13%.
-   كثافة الصفوف حسب عدد البنود: حتى 17 بنداً كثافة عادية، وأكثر من
-   ذلك كثافة عالية (36 صفاً في الصفحة) كما في نمط KMA. */
-function quotePrintHtml(q){
-  var p=projectById(q.projectId);var cl=clientById(q.clientId);
-  var ret=returnsTotalForQuotation(q.id);
-  var dense=q.items.length>17;
-  var perPage=dense?36:20;
-  var s0=state.settings[0]||{};
-  var title='<h1>عرض سعر</h1><h2>رقم '+esc(q.number)+' — التاريخ: '+fmtDate(q.createdAt)+'</h2>'+
-  (s0.taxNumber?'<p>الرقم الضريبي: <span dir="ltr">'+esc(s0.taxNumber)+'</span></p>':"")+
-  '<p>العميل: '+esc(cl?cl.name:"")+' — الجوال: <span dir="ltr">'+esc(cl?cl.phone||"":"")+'</span>'+(cl&&cl.taxNumber?' — الرقم الضريبي: <span dir="ltr">'+esc(cl.taxNumber)+'</span>':"")+' — المشروع: '+(p?esc(p.number)+" — "+esc(p.title):"")+'</p>';
-  var head='<colgroup><col style="width:5%"><col style="width:50%"><col style="width:10%"><col style="width:10%"><col style="width:12%"><col style="width:13%"></colgroup>'+
-  '<tr><th>الرقم</th><th>بيان الأعمال</th><th>الوحدة</th><th>الكمية</th><th>السعر الإفرادي</th><th>السعر الإجمالي</th></tr>';
-  var rows=q.items.map(function(it,i){return '<tr><td>'+(i+1)+'</td><td>'+esc(it.name)+'</td><td>'+esc(it.unit||"—")+'</td><td>'+it.qty+'</td><td>'+fmtM(it.price)+'</td><td>'+fmtM(it.qty*it.price)+'</td></tr>';});
-  var foot='<p>المجموع الفرعي: '+fmtM(q.subtotal)+' — الضريبة (15%): '+fmtM(q.vat)+' — <b>الإجمالي: '+fmtM(q.total)+'</b></p>';
-  if(q.maintenance&&q.maintenance.included)foot+='<p>يشمل عقد صيانة: '+esc(q.maintenance.type)+' — '+fmtM(q.maintenance.amount)+' — '+esc(q.maintenance.duration)+'</p>';
-  if(ret>0){foot+='<p>مرتجع مواد: '+fmtM(ret)+' — <b>صافي العرض بعد المرتجع: '+fmtM(q.total-ret)+'</b></p>';
-    foot+='<table><tr><th>المادة المرتجعة</th><th>الكمية</th><th>القيمة</th></tr>';
-    returnsForQuotation(q.id).forEach(function(r){foot+='<tr><td>'+esc(r.itemName)+'</td><td>'+r.qty+'</td><td>'+fmtM(r.amount)+'</td></tr>';});
-    foot+='</table>';}
-  foot+='<p style="margin-top:24px">توقيع العميل: .................... &nbsp;&nbsp; توقيع المدير: ....................</p>';
-  var pages=paginateRows(rows,perPage,6);
-  var out="";
-  pages.forEach(function(rs,i){
-    var inner=(i===0?title:"")+'<table>'+head+rs.join("")+'</table>'+(i===pages.length-1?foot:"");
-    out+=letterheadPage(inner,i+1,pages.length,"تابع عرض السعر رقم "+q.number,dense);
-  });
-  return out;
-}
-function printQuotation(qid){var q=quoteById(qid);if(!q)return {error:"العرض غير موجود."};printHtml(quotePrintHtml(q));return {ok:true};}
-/* تطبيع رقم الجوال السعودي لروابط wa.me: حذف غير الأرقام، وتحويل
-   الصفر الأولى إلى 966 للرقم المكوّن من 10 أرقام. */
-function normalizePhone(raw){
-  var phone=String(raw||"").replace(/[^0-9]/g,"");
-  if(phone.length===10&&phone.charAt(0)==="0")phone="966"+phone.slice(1);
-  return phone;
-}
-function waLinkForQuote(qid){
-  var q=quoteById(qid);if(!q)return null;
-  var cl=clientById(q.clientId);var phone=normalizePhone(cl?cl.phone||"":"");
-  if(!phone)return {error:"رقم جوال العميل غير مسجل."};
-  var p=projectById(q.projectId);
-  var items=q.items.map(function(it){return it.name+" ×"+it.qty;}).join("، ");
-  var msg="السلام عليكم، عرض السعر رقم "+q.number+" — المشروع: "+(p?p.title:"")+" — المواد: "+items+" — الإجمالي شامل الضريبة: "+fmtM(q.total)+" "+((state.settings[0]||{}).currency||"ر.س");
-  return {url:"https://wa.me/"+phone+"?text="+encodeURIComponent(msg),phone:phone};
-}
-var SITE_URL="https://kma-system.vercel.app";
-/* رابط واتساب الفني المُسند: إشعار مختصر فقط بوجود مهمة جديدة —
-   الفني يدخل النظام بيوزره الخاص لعرض المهام واعتمادها من داخل
-   النظام. لا تُرسل تفاصيل المهمة (العنوان واسم العميل ورقمه والعمل
-   المطلوب) عبر واتساب إطلاقاً؛ التفاصيل الكاملة تبقى داخل النظام
-   فقط بعد تسجيل دخول الفني. الإرسال نفسه يتم بفتح wa.me من
-   متصفح المدير (ليس إرسالاً تلقائياً من الخادم) — واتساب لا يوفّر
-   إرسالاً من الخادم بلا مزوّد رسمي مدفوع. */
-function buildTechnicianWhatsApp(projectId,technicianId){
-  var p=projectById(projectId);if(!p)return {error:"المشروع غير موجود."};
-  var t=userById(technicianId);if(!t)return {error:"الفني غير موجود."};
-  var phone=normalizePhone(t.phone);
-  if(!phone)return {error:"رقم جوال الفني «"+(t.fullName||t.username)+"» غير مسجل — سجّله من شاشة المستخدمين أولاً."};
-  var msg="لديك مهمة جديدة في نظام إدارة مشاريع المقاولات — سجّل دخولك بيوزرك لعرض المهام واعتمادها\n"+SITE_URL;
-  return {url:"https://wa.me/"+phone+"?text="+encodeURIComponent(msg),phone:phone,technicianId:t.id,projectId:p.id};
-}
-function sendTechnicianWhatsApp(projectId,technicianId){
-  var r=buildTechnicianWhatsApp(projectId,technicianId);
-  if(!r||r.error)return r||{error:"تعذّر بناء رابط الواتساب."};
-  var t=userById(technicianId),p=projectById(projectId);
-  logAudit("assign_whatsapp","إرسال واتساب للفني "+(t?t.fullName||t.username:"")+" — المشروع "+(p?p.number:""),"","إدارة المشاريع");
-  save();
-  if(typeof window!=="undefined"&&window.open){try{window.open(r.url,"_blank");}catch(e){}}
-  return r;
-}
-function sendQuoteWhatsApp(qid){
-  var r=waLinkForQuote(qid);
-  if(!r)return {error:"العرض غير موجود."};
-  if(r.error)return r;
-  if(typeof window!=="undefined"&&window.open){try{window.open(r.url,"_blank");}catch(e){}}
-  return r;
-}
-function downloadTextFile(filename,content,type){
-  try{
-    var blob=new Blob([content],{type:type||"text/plain;charset=utf-8"});
-    var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=filename;document.body.appendChild(a);a.click();
-    setTimeout(function(){try{URL.revokeObjectURL(a.href);a.remove();}catch(e){}},500);
-    return true;
-  }catch(e){return false;}
-}
-function buildTrialCSV(){
-  var tb=trialBalance();
-  var rows=[["ميزان مراجعة بحسابات العملاء"],["العميل","رصيد افتتاحي","مدين (مديونيات معتمدة بعد المرتجع)","دائن (دفعات)","رصيد ختامي"]];
-  tb.rows.forEach(function(r){rows.push([r.client.name,r.opening.toFixed(2),r.debit.toFixed(2),r.credit.toFixed(2),r.closing.toFixed(2)]);});
-  rows.push(["الإجمالي الكلي",tb.total.opening.toFixed(2),tb.total.debit.toFixed(2),tb.total.credit.toFixed(2),tb.total.closing.toFixed(2)]);
-  return "\uFEFF"+rows.map(function(r){return r.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"';}).join(",");}).join("\r\n");
-}
-function buildStatementCSV(clientId){
-  var st=clientStatement(clientId);if(!st)return "";
-  var rows=[["كشف حساب العميل التحليلي — "+st.client.name],["التاريخ","رقم المستند","البيان","مدين","دائن","الرصيد الجاري"]];
-  st.moves.forEach(function(m){rows.push([m.date,m.doc,m.desc,m.debit?m.debit.toFixed(2):"",m.credit?m.credit.toFixed(2):"",m.balance.toFixed(2)]);});
-  rows.push(["الرصيد النهائي","","","","",st.finalBalance.toFixed(2)]);
-  return "\uFEFF"+rows.map(function(r){return r.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"';}).join(",");}).join("\r\n");
-}
-function exportTrialExcel(){downloadTextFile("trial-balance.csv",buildTrialCSV(),"text/csv;charset=utf-8");return true;}
-function exportStatementExcel(cid){if(!cid)cid=state.ui.statementClientId;var csv=buildStatementCSV(cid);if(!csv)return false;downloadTextFile("client-statement.csv",csv,"text/csv;charset=utf-8");return true;}
-function trialPrintHtml(){
-  var tb=trialBalance();
-  var title='<h1>ميزان مراجعة بحسابات العملاء</h1><h2>التاريخ: '+today()+'</h2>';
-  var head='<colgroup><col style="width:40%"><col style="width:15%"><col style="width:15%"><col style="width:15%"><col style="width:15%"></colgroup><tr><th>العميل</th><th>رصيد افتتاحي</th><th>مدين</th><th>دائن</th><th>رصيد ختامي</th></tr>';
-  var rows=tb.rows.map(function(r){return '<tr><td>'+esc(r.client.name)+'</td><td>'+fmtM(r.opening)+'</td><td>'+fmtM(r.debit)+'</td><td>'+fmtM(r.credit)+'</td><td>'+fmtM(r.closing)+'</td></tr>';});
-  var foot='<tr><td><b>الإجمالي الكلي</b></td><td><b>'+fmtM(tb.total.opening)+'</b></td><td><b>'+fmtM(tb.total.debit)+'</b></td><td><b>'+fmtM(tb.total.credit)+'</b></td><td><b>'+fmtM(tb.total.closing)+'</b></td></tr>';
-  var pages=paginateRows(rows,24,1);
-  var out="";
-  pages.forEach(function(rs,i){
-    var inner=(i===0?title:"")+'<table>'+head+rs.join("")+(i===pages.length-1?foot:"")+'</table>';
-    out+=letterheadPage(inner,i+1,pages.length,"تابع ميزان المراجعة");
-  });
-  return out;
-}
-function statementPrintHtml(clientId){
-  var st=clientStatement(clientId);if(!st)return "";
-  var s0=state.settings[0]||{};
-  var taxLine="";
-  if(s0.taxNumber)taxLine+='<p>الرقم الضريبي للشركة: <span dir="ltr">'+esc(s0.taxNumber)+'</span></p>';
-  if(st.client.taxNumber)taxLine+='<p>الرقم الضريبي للعميل: <span dir="ltr">'+esc(st.client.taxNumber)+'</span></p>';
-  var title='<h1>كشف حساب العميل التحليلي</h1><h2>'+esc(st.client.name)+' — التاريخ: '+today()+'</h2>'+taxLine;
-  var head='<colgroup><col style="width:12%"><col style="width:13%"><col style="width:41%"><col style="width:11%"><col style="width:11%"><col style="width:12%"></colgroup><tr><th>التاريخ</th><th>رقم المستند</th><th>البيان</th><th>مدين</th><th>دائن</th><th>الرصيد الجاري</th></tr>';
-  var rows=st.moves.map(function(m){return '<tr><td>'+esc(m.date)+'</td><td>'+esc(m.doc)+'</td><td>'+esc(m.desc)+'</td><td>'+(m.debit?fmtM(m.debit):"—")+'</td><td>'+(m.credit?fmtM(m.credit):"—")+'</td><td>'+fmtM(m.balance)+'</td></tr>';});
-  var foot='<p><b>الرصيد النهائي: '+fmtM(st.finalBalance)+'</b></p>';
-  var pages=paginateRows(rows,24,2);
-  var out="";
-  pages.forEach(function(rs,i){
-    var inner=(i===0?title:"")+'<table>'+head+rs.join("")+'</table>'+(i===pages.length-1?foot:"");
-    out+=letterheadPage(inner,i+1,pages.length,"تابع كشف حساب العميل "+st.client.name);
-  });
-  return out;
-}
-function printTrialReport(){printHtml(trialPrintHtml());return true;}
-function printStatementReport(cid){if(!cid)cid=state.ui.statementClientId;var h=statementPrintHtml(cid);if(!h)return false;printHtml(h);return true;}
-/* سند قبض — نفس نمط الطباعة على الترويسة (صفحة مستقلة بترويستها) */
-function receiptPrintHtml(pay){
-  var cl=clientById(pay.clientId);
-  var inner='<h1>سند قبض</h1><h2>رقم السند: '+esc(pay.docNo)+' — التاريخ: '+esc(pay.date)+'</h2>'+
-  '<table><tr><th style="width:30%">البيان</th><th>التفاصيل</th></tr>'+
-  '<tr><td>العميل</td><td>'+esc(cl?cl.name:"")+'</td></tr>'+
-  '<tr><td>نوع الدفعة</td><td>'+(pay.kind==="advance"?"دفعة مقدمة":"دفعة سداد")+'</td></tr>'+
-  '<tr><td>المبلغ</td><td><b>'+fmtM(pay.amount)+' '+esc((state.settings[0]||{}).currency||"ر.س")+'</b></td></tr>'+
-  '<tr><td>ملاحظة</td><td>'+esc(pay.note||"—")+'</td></tr>'+
-  '<tr><td>سُجل بواسطة</td><td>'+esc(pay.by||"—")+'</td></tr></table>'+
-  '<p style="margin-top:28px">توقيع المحاسب: .................... &nbsp;&nbsp; توقيع العميل: ....................</p>';
-  return letterheadPage(inner,1,1,"");
-}
-function printReceipt(payId){
-  var pay=null;for(var i=0;i<state.payments.length;i++)if(String(state.payments[i].id)===String(payId))pay=state.payments[i];
-  if(!pay)return {error:"الدفعة غير موجودة."};
-  printHtml(receiptPrintHtml(pay));return {ok:true};
-}
-function doPrintReceipt(pid){var r=printReceipt(pid);if(r.error)alert(r.error);}
-/* ---------- التقارير الرقابية ---------- */
-function auditFilters(){
-  if(!state.ui.auditFilters)state.ui.auditFilters={user:"",action:"",from:"",to:"",q:""};
-  return state.ui.auditFilters;
-}
-function filterAudit(){
-  var f=auditFilters();
-  var rows=(state.audit_log||[]).slice().sort(function(a,b){return String(b.at||"").localeCompare(String(a.at||""));});
-  return rows.filter(function(e){
-    var du=auditDisplayUser(e);
-    if(f.user&&String(du.username)!==String(f.user))return false;
-    if(f.action&&e.action!==f.action)return false;
-    if(f.from&&String(e.at||"").slice(0,10)<f.from)return false;
-    if(f.to&&String(e.at||"").slice(0,10)>f.to)return false;
-    if(f.q){var s=(e.summary||"")+" "+(e.docNo||"")+" "+(du.username||"")+" "+(du.fullName||"")+" "+auditActionLabel(e.action);if(s.indexOf(f.q)<0)return false;}
-    return true;
-  });
-}
-function applyAuditFilters(){
-  var f=auditFilters();
-  f.user=$("afUser")?$("afUser").value:"";
-  f.action=$("afAction")?$("afAction").value:"";
-  f.from=$("afFrom")?$("afFrom").value:"";
-  f.to=$("afTo")?$("afTo").value:"";
-  f.q=$("afQ")?$("afQ").value.trim():"";
-  render();
-}
-function clearAuditFilters(){state.ui.auditFilters={user:"",action:"",from:"",to:"",q:""};render();}
-function auditUsers(){
-  var seen={};var out=[];
-  (state.audit_log||[]).forEach(function(e){var du=auditDisplayUser(e);var k=String(du.username||"");if(k&&!seen[k]){seen[k]=1;out.push({username:k,fullName:du.fullName||k});}});
-  return out;
-}
-function buildAuditCSV(){
-  var rows=filterAudit();
-  var out=[["التقارير الرقابية — سجل العمليات"],["التاريخ والوقت","المستخدم","الاسم","الدور","العملية","الشاشة","رقم المستند","التفاصيل"]];
-  rows.forEach(function(e){var du=auditDisplayUser(e);out.push([fmtDateTime(e.at),du.username,du.fullName,auditRoleLabel(du.role),auditActionLabel(e.action),e.screen||"",e.docNo||"",e.summary||""]);});
-  return "\uFEFF"+out.map(function(r){return r.map(function(c){return '"'+String(c==null?"":c).replace(/"/g,'""')+'"';}).join(",");}).join("\r\n");
-}
-function exportAuditExcel(){downloadTextFile("audit-log.csv",buildAuditCSV(),"text/csv;charset=utf-8");return true;}
-function auditPrintHtml(){
-  var rows=filterAudit();
-  var title='<h1>التقارير الرقابية</h1><h2>سجل العمليات — التاريخ: '+today()+' — عدد العمليات: '+rows.length+'</h2>';
-  var head='<colgroup><col style="width:17%"><col style="width:12%"><col style="width:18%"><col style="width:11%"><col style="width:42%"></colgroup><tr><th>التاريخ والوقت</th><th>المستخدم</th><th>العملية</th><th>رقم المستند</th><th>التفاصيل</th></tr>';
-  var rs=rows.map(function(e){var du=auditDisplayUser(e);return '<tr><td>'+fmtDateTime(e.at)+'</td><td>'+esc(du.username)+' ('+esc(auditRoleLabel(du.role))+')</td><td>'+esc(auditActionLabel(e.action))+'</td><td>'+esc(e.docNo||"—")+'</td><td>'+esc(e.summary||"")+'</td></tr>';});
-  var pages=paginateRows(rs,24,0);
-  var out="";
-  pages.forEach(function(pr,i){
-    var inner=(i===0?title:"")+'<table>'+head+pr.join("")+'</table>';
-    out+=letterheadPage(inner,i+1,pages.length,"تابع التقارير الرقابية");
-  });
-  return out;
-}
-function printAuditReport(){logAudit("print_report","طباعة/تصدير PDF للتقارير الرقابية — "+filterAudit().length+" عملية معروضة","","التقارير الرقابية");save();printHtml(auditPrintHtml());return true;}
-function screenAudit(){
-  var f=auditFilters();
-  var rows=filterAudit();
-  var h='<div class="card"><h2>التقارير الرقابية</h2>'+
-  '<p class="muted">كل العمليات التي تمت في النظام من أي مستخدم، بالتاريخ والوقت — من تسجيل الدخول إلى الخروج. السجل محمي: لا يمكن حذف سجلاته من الواجهة، ولا يُشمل في النسخة الاحتياطية، ولا يُستبدل عند استرجاع نسخة، ولا يُمسح عند تصفير البيانات إلا بطلب صريح من المستخدم.</p>'+
-  '<div class="form-grid">'+
-  '<div><label>المستخدم</label><select id="afUser" class="inp"><option value="">— كل المستخدمين —</option>'+auditUsers().map(function(u){return '<option value="'+esc(u.username)+'"'+(f.user===u.username?" selected":"")+'>'+esc(u.fullName)+' ('+esc(u.username)+')</option>';}).join("")+'</select></div>'+
-  '<div><label>نوع العملية</label><select id="afAction" class="inp"><option value="">— كل العمليات —</option>'+Object.keys(AUDIT_ACTIONS).map(function(k){return '<option value="'+k+'"'+(f.action===k?" selected":"")+'>'+esc(AUDIT_ACTIONS[k])+'</option>';}).join("")+'</select></div>'+
-  '<div><label>من تاريخ</label><input id="afFrom" type="date" class="inp" value="'+esc(f.from)+'"></div>'+
-  '<div><label>إلى تاريخ</label><input id="afTo" type="date" class="inp" value="'+esc(f.to)+'"></div>'+
-  '<div><label>بحث نصي</label><input id="afQ" class="inp" placeholder="ابحث في التفاصيل أو المستند أو المستخدم" value="'+esc(f.q)+'"></div></div>'+
-  '<div class="row" style="margin-top:.6rem"><button type="button" class="btn btn-navy btn-sm" onclick="applyAuditFilters()">تطبيق الفلاتر</button>'+
-  '<button type="button" class="btn btn-ghost btn-sm" onclick="clearAuditFilters()">مسح الفلاتر</button>'+
-  '<button type="button" class="btn btn-gold btn-sm" onclick="exportAuditExcel()">تصدير Excel</button>'+
-  '<button type="button" class="btn btn-navy btn-sm" onclick="printAuditReport()">تصدير PDF (طباعة)</button></div>'+
-  '<p class="muted">تصدير PDF يتم عبر نافذة الطباعة — اختر «حفظ كـ PDF» من متصفحك.</p>'+
-  '<p><b>عدد العمليات المعروضة: <span class="num">'+rows.length+'</span></b> من أصل <span class="num">'+((state.audit_log||[]).length)+'</span></p>';
-  if(!rows.length)h+='<p class="muted">لا توجد عمليات مطابقة للفلاتر.</p>';
-  else{
-    h+='<table><tr><th>التاريخ والوقت</th><th>المستخدم</th><th>العملية</th><th>الشاشة</th><th>رقم المستند</th><th>التفاصيل</th></tr>';
-    rows.forEach(function(e){
-      var du=auditDisplayUser(e);
-      h+='<tr><td class="num">'+fmtDateTime(e.at)+'</td><td>'+esc(du.fullName)+' ('+esc(du.username)+')</td><td>'+esc(auditActionLabel(e.action))+'</td><td>'+esc(e.screen||"—")+'</td><td class="num">'+esc(e.docNo||"—")+'</td><td>'+esc(e.summary||"")+'</td></tr>';
-    });
-    h+='</table>';
-  }
-  return h+'</div>';
-}
-
 /* ميزان مراجعة بحسابات العملاء: افتتاحي + مدين (مديونيات معتمدة) + دائن
    (دفعات) + ختامي لكل عميل، مع صف إجمالي كلي. */
 function trialBalance(){
@@ -1270,106 +837,34 @@ function deleteProject(projectId){
   state.projects=state.projects.filter(function(x){return String(x.id)!==String(projectId);});
   logAudit("delete_project","حذف المشروع "+p.number+" ("+p.title+")",p.number,"إدارة المشاريع");save();return {ok:true};
 }
-/* ---------- الأصناف ---------- */
-/* سجل الصنف: {id, code, name, unit, salePrice, costPrice, qty, createdAt, updatedAt}.
-   الكود تلقائي متسلسل ITM-0001 ولا يتكرر أبداً (nextSerial + فحص isSerialUsed).
-   qty هو رصيد المخزون الحالي: يُخصم عند صرف المواد ويُعاد عند المرتجع. */
-function itemById(id){for(var i=0;i<state.items.length;i++)if(String(state.items[i].id)===String(id))return state.items[i];return null;}
-function itemByCode(code){code=String(code||"").trim();if(!code)return null;for(var i=0;i<state.items.length;i++)if(String(state.items[i].code)===String(code))return state.items[i];return null;}
-function itemByName(name){name=String(name||"").trim();if(!name)return null;for(var i=0;i<state.items.length;i++)if(String(state.items[i].name).trim()===name)return state.items[i];return null;}
-function searchItems(q){
-  q=String(q||"").trim();
-  if(!q)return state.items.slice();
-  return state.items.filter(function(it){return String(it.name||"").indexOf(q)>=0||String(it.code||"").indexOf(q)>=0;});
-}
-/* هل على الصنف أي حركة؟ الاسم في أي بند عرض سعر، أو في صرف مواد، أو في مرتجع مواد.
-   الحركة تمنع الحذف نهائياً (حماية مثل حماية حذف المشروع) ويبقى التعديل مسموحاً. */
-function itemHasMovements(item){
-  var name=String(item.name||"").trim();
-  if(!name)return false;
-  for(var i=0;i<state.quotations.length;i++){var q=state.quotations[i];for(var j=0;j<(q.items||[]).length;j++)if(String(q.items[j].name).trim()===name)return true;}
-  for(var k=0;k<state.material_issues.length;k++)if(String(state.material_issues[k].itemName).trim()===name)return true;
-  for(var m=0;m<state.material_returns.length;m++)if(String(state.material_returns[m].itemName).trim()===name)return true;
-  return false;
-}
-function createItem(code,name,unit,salePrice,costPrice,qty){
-  name=String(name||"").trim();if(!name)return {error:"اسم الصنف مطلوب."};
-  code=String(code||"").trim()||nextSerial("item","ITM");
-  if(itemByCode(code))return {error:"كود الصنف «"+code+"» مستخدم من قبل — أدخل كوداً آخر."};
-  var it={id:uid("it"),code:code,name:name,unit:String(unit||"").trim(),salePrice:Number(salePrice)||0,costPrice:Number(costPrice)||0,qty:Number(qty)||0,createdAt:nowISO(),updatedAt:nowISO()};
-  state.items.push(it);logAudit("create_item","إنشاء صنف جديد: "+it.code+" — "+it.name+" (سعر البيع "+fmtM(it.salePrice)+" — الكمية "+it.qty+")",it.code,"الأصناف");save();return {item:it};
-}
-function updateItem(itemId,fields){
-  var it=itemById(itemId);if(!it)return {error:"الصنف غير موجود."};
-  if(fields.name!==undefined&&String(fields.name).trim())it.name=String(fields.name).trim();
-  if(fields.code!==undefined){var nc=String(fields.code).trim();if(nc&&nc!==it.code&&itemByCode(nc))return {error:"كود الصنف «"+nc+"» مستخدم من قبل."};if(nc)it.code=nc;}
-  if(fields.unit!==undefined)it.unit=String(fields.unit||"").trim();
-  if(fields.salePrice!==undefined)it.salePrice=Number(fields.salePrice)||0;
-  if(fields.costPrice!==undefined)it.costPrice=Number(fields.costPrice)||0;
-  if(fields.qty!==undefined)it.qty=Number(fields.qty)||0;
-  it.updatedAt=nowISO();
-  logAudit("update_item","تعديل الصنف "+it.code+" — "+it.name,it.code,"الأصناف");save();return {item:it};
-}
-function deleteItem(itemId){
-  var it=itemById(itemId);if(!it)return {error:"الصنف غير موجود."};
-  if(itemHasMovements(it))return {error:"لا يمكن حذف الصنف «"+it.name+"» — توجد عليه حركات (بنود عروض أسعار أو صرف/مرتجع مواد). التعديل مسموح أما الحذف فممنوع."};
-  state.items=state.items.filter(function(x){return String(x.id)!==String(itemId);});
-  logAudit("delete_item","حذف الصنف "+it.code+" — "+it.name,it.code,"الأصناف");save();return {ok:true};
-}
-/* ---------- الأصناف — استيراد وتصدير CSV (Excel) ---------- */
-function parseCSVLine(line){
-  var out=[],cur="",inq=false;
-  for(var i=0;i<line.length;i++){var ch=line[i];
-    if(inq){if(ch==='"'){if(line[i+1]==='"'){cur+='"';i++;}else inq=false;}else cur+=ch;}
-    else if(ch==='"')inq=true;
-    else if(ch===','){out.push(cur);cur="";}
-    else cur+=ch;}
-  out.push(cur);return out;
-}
-function toCSV(rows){
-  return "\uFEFF"+rows.map(function(r){return r.map(function(c){return '"'+String(c==null?"":c).replace(/"/g,'""')+'"';}).join(",");}).join("\r\n");
-}
-function importItemsCSV(text){
-  var t=String(text||"").replace(/^\uFEFF/,"").replace(/\r\n/g,"\n").replace(/\r/g,"\n");
-  var lines=t.split("\n");
-  var imported=0,duplicated=0,rejected=0;
-  lines.forEach(function(line){
-    if(!String(line).trim())return;
-    var cells=parseCSVLine(line);
-    var code=String(cells[0]||"").trim();
-    var name=String(cells[1]||"").trim();
-    if(!code&&!name)return;
-    var lc0=code.toLowerCase(),lc1=name.toLowerCase();
-    if(lc0==="الكود"||lc0==="code"||lc1==="الاسم"||lc1==="name")return; /* صف الترويسة */
-    if(!name){rejected++;return;}
-    if(code&&itemByCode(code)){duplicated++;return;}
-    var r=createItem(code,name,String(cells[2]||"").trim(),cells[3],cells[4],cells[5]);
-    if(r.error){if(r.error.indexOf("مستخدم من قبل")>=0)duplicated++;else rejected++;}
-    else imported++;
-  });
-  logAudit("import_items","استيراد أصناف من ملف Excel (CSV): مستورد "+imported+" — مكرر "+duplicated+" — مرفوض "+rejected,"","الأصناف");
-  save();
-  return {imported:imported,duplicated:duplicated,rejected:rejected};
-}
-function buildItemsCSV(){
-  var rows=[["الأصناف"],["الكود","الاسم","الوحدة","سعر البيع","سعر التكلفة","الكمية"]];
-  state.items.forEach(function(it){rows.push([it.code,it.name,it.unit||"",Number(it.salePrice||0).toFixed(2),Number(it.costPrice||0).toFixed(2),String(it.qty||0)]);});
-  return toCSV(rows);
-}
-function exportItemsCSV(){
-  downloadTextFile("items.csv",buildItemsCSV(),"text/csv;charset=utf-8");
-  logAudit("export_items","تصدير الأصناف إلى ملف Excel (CSV) — "+state.items.length+" صنفاً","","الأصناف");save();return true;
-}
 function createUser(username,password,fullName,role,phone,permissions){
   username=String(username||"").trim();password=String(password||"");
   if(!username||!password)return {error:"اسم المستخدم وكلمة المرور مطلوبان."};
   if(!ROLES[role])return {error:"اختر دوراً صحيحاً."};
+  /* قيود غير مدير النظام: لا إنشاء مستخدم بدور «مدير النظام» ولا منح
+     صلاحية «التقارير الرقابية» — محاولتهما مرفوضة وتُسجَّل في التدقيق. */
+  if(callerIsNonAdmin()){
+    if(role==="admin"){logAudit("create_user_denied","محاولة مرفوضة: المستخدم "+state.user.username+" حاول إنشاء المستخدم «"+username+"» بدور «مدير النظام» — التعيين لمدير النظام فقط.",username,"المستخدمون");save();return {error:"تعيين دور «مدير النظام» لمدير النظام فقط — لا يمكنك إنشاء مستخدم بهذا الدور."};}
+    if(Array.isArray(permissions)&&permissions.indexOf("audit")>=0){logAudit("create_user_denied","محاولة مرفوضة: المستخدم "+state.user.username+" حاول منح المستخدم «"+username+"» صلاحية «التقارير الرقابية» — المنح لمدير النظام فقط.",username,"المستخدمون");save();return {error:"منح صلاحية «التقارير الرقابية» لمدير النظام فقط."};}
+  }
   if(findLocalUser(username))return {error:"اسم المستخدم «"+username+"» موجود من قبل."};
   var u={id:uid("u"),username:username,password:password,fullName:String(fullName||"").trim()||username,role:role,phone:String(phone||"").trim(),permissions:Array.isArray(permissions)?permissions.slice():(ROLE_SCREENS[role]||[]).slice(),companyId:COMPANY_ID,active:true,rev:1,createdAt:nowISO()};
   state.users.push(u);logAudit("create_user","إنشاء مستخدم جديد: "+u.username+" ("+u.fullName+") — الدور: "+roleName(u.role),u.username,"المستخدمون");save();return {user:u};
 }
 function updateUser(userId,fields){
   var u=userById(userId);if(!u)return {error:"المستخدم غير موجود."};
+  /* قيود غير مدير النظام (تُرفض من المنطق وتُسجَّل في التدقيق):
+     - حساب «1» لا يُعدَّل بأي شكل إطلاقاً.
+     - حساب بدور «مدير النظام» (غير «1») لا يُعدَّل.
+     - لا تعيين دور «مدير النظام» لأي مستخدم.
+     - لا منح صلاحية «التقارير الرقابية» جديدة؛ أما الإبقاء على صلاحية
+       رقابية ممنوحة سابقاً عند تعديل المستخدم فليس منحاً فيُسمح به. */
+  if(callerIsNonAdmin()){
+    if(u.username==="1"){logAudit("update_user_denied","محاولة مرفوضة: المستخدم "+state.user.username+" حاول تعديل حساب مدير النظام «1» — التعديل لمدير النظام فقط.",u.username,"المستخدمون");save();return {error:"لا يمكن تعديل حساب مدير النظام «1» — التعديل لمدير النظام فقط."};}
+    if(u.role==="admin"){logAudit("update_user_denied","محاولة مرفوضة: المستخدم "+state.user.username+" حاول تعديل حساب مدير النظام «"+u.username+"» — التعديل لمدير النظام فقط.",u.username,"المستخدمون");save();return {error:"لا يمكن تعديل حساب مدير نظام — التعديل لمدير النظام فقط."};}
+    if(fields.role==="admin"){logAudit("update_user_denied","محاولة مرفوضة: المستخدم "+state.user.username+" حاول تعيين دور «مدير النظام» للمستخدم «"+u.username+"» — التعيين لمدير النظام فقط.",u.username,"المستخدمون");save();return {error:"تعيين دور «مدير النظام» لمدير النظام فقط."};}
+    if(Array.isArray(fields.permissions)&&fields.permissions.indexOf("audit")>=0&&!(Array.isArray(u.permissions)&&u.permissions.indexOf("audit")>=0)){logAudit("update_user_denied","محاولة مرفوضة: المستخدم "+state.user.username+" حاول منح المستخدم «"+u.username+"» صلاحية «التقارير الرقابية» — المنح لمدير النظام فقط.",u.username,"المستخدمون");save();return {error:"منح صلاحية «التقارير الرقابية» لمدير النظام فقط."};}
+  }
   if(fields.username&&String(fields.username).trim()!==u.username&&findLocalUser(fields.username))return {error:"اسم المستخدم الجديد موجود من قبل."};
   /* مدير النظام «1» هو مسؤول النظام دائماً: لا يُغيَّر دوره ولا تُقيَّد
      صلاحياته — يملك كل الصلاحيات بلا استثناء. */
@@ -1378,7 +873,7 @@ function updateUser(userId,fields){
     if(fields.role&&fields.role!=="admin")return {error:"لا يمكن تغيير دور مدير النظام «1» — هو مسؤول النظام دائماً."};
     if(fields.active===false)return {error:"لا يمكن إيقاف مدير النظام «1» — يجب أن يبقى حساب مسؤول النظام نشطاً دائماً."};
     fields.role="admin";
-    fields.permissions=["dashboard","projects","tasks","quotations","approvals","materials","returns","contracts","financial","accounts","reports","audit","users","employees","notifications","settings","items"];
+    fields.permissions=FULL_PERMS.slice();
   }
   var pwChanged=!!fields.password&&String(fields.password)!==String(u.password);
   if(fields.username)u.username=String(fields.username).trim();
@@ -1402,10 +897,478 @@ function updateUser(userId,fields){
 }
 function deleteUser(userId){
   var u=userById(userId);if(!u)return {error:"المستخدم غير موجود."};
+  /* الحذف لمدير النظام فقط: أي محاولة حذف من غيره (حتى باستدعاء
+     الدالة مباشرة) تُرفض برسالة واضحة وتُسجَّل في التدقيق. */
+  if(callerIsNonAdmin()){logAudit("delete_user_denied","محاولة حذف مرفوضة: المستخدم "+state.user.username+" حاول حذف المستخدم "+u.username+" ("+u.fullName+") — الحذف لمدير النظام فقط.",u.username,"المستخدمون");save();return {error:"حذف المستخدمين لمدير النظام فقط — لا يمكنك حذف هذا المستخدم."};}
   if(u.username==="1")return {error:"لا يمكن حذف مدير النظام."};
   if(state.assignments.some(function(a){return String(a.technicianId)===String(userId);}))return {error:"لا يمكن حذف هذا المستخدم — لديه مهام مسندة."};
   state.users=state.users.filter(function(x){return String(x.id)!==String(userId);});
   logAudit("delete_user","حذف المستخدم "+u.username+" ("+u.fullName+")",u.username,"المستخدمون");save();return {ok:true};
+}
+
+function accMonthly(){
+  var map={};
+  function add(ym,rev,exp){if(!ym||ym.length<7)return;if(!map[ym])map[ym]={rev:0,exp:0};map[ym].rev+=rev;map[ym].exp+=exp;}
+  state.payments.forEach(function(p){add(monthKey(p.date),Number(p.amount)||0,0);});
+  state.transactions.forEach(function(tr){if(isCountedRevenue(tr))return;if(tr.kind==="revenue")add(monthKey(tr.date),Number(tr.amount)||0,0);else add(monthKey(tr.date),0,Number(tr.amount)||0);});
+  state.material_issues.forEach(function(m){var q=quoteById(m.quotationId);if(!q||q.status!=="financial_approved")return;var qty=Number(m.qtyIssued)||0;if(qty>0)add(monthKey(m.date||String(q.financialApprovedAt||"").slice(0,10)),0,qty*quoteItemPrice(q,m.itemName));});
+  var keys=Object.keys(map).sort();
+  return keys.map(function(k){return {ym:k,label:monthLabel(k),rev:Math.round(map[k].rev*100)/100,exp:Math.round(map[k].exp*100)/100,net:Math.round((map[k].rev-map[k].exp)*100)/100};});
+}
+function accountMovements(){
+  var moves=[];
+  state.payments.forEach(function(p){moves.push({date:p.date,doc:p.docNo,desc:"دفعة من العميل "+((clientById(p.clientId)||{}).name||"")+(p.note?" — "+p.note:""),category:p.kind==="advance"?"دفعة مقدمة":"دفعة سداد",method:"نقدي",kind:"revenue",amount:Number(p.amount)||0});});
+  state.material_issues.forEach(function(m){
+    var q=quoteById(m.quotationId);if(!q||q.status!=="financial_approved")return;
+    var qty=Number(m.qtyIssued)||0;if(qty<=0)return;
+    moves.push({date:m.date||String(q.financialApprovedAt||"").slice(0,10),doc:q.number,desc:"تكلفة مواد منصرفة — "+m.itemName,category:"مواد",method:"نقدي",kind:"expense",amount:Math.round(qty*quoteItemPrice(q,m.itemName)*100)/100});
+  });
+  state.transactions.forEach(function(tr){
+    if(isCountedRevenue(tr))return;
+    moves.push({date:tr.date,doc:tr.docNo,desc:tr.description||tr.category,category:tr.category,method:tr.method,kind:tr.kind,amount:Number(tr.amount)||0});
+  });
+  state.material_returns.forEach(function(r){moves.push({date:r.date,doc:r.docNo,desc:"مرتجع مواد — "+r.itemName+" ×"+r.qty+" (تخفيض مديونية "+fmtM(r.amount)+")",category:"مرتجع مواد",method:"—",kind:"return",amount:Number(r.amount)||0});});
+  moves.sort(function(a,b){return String(b.date).localeCompare(String(a.date));});
+  return moves;
+}
+function applyAuditFilters(){
+  var f=auditFilters();
+  f.user=$("afUser")?$("afUser").value:"";
+  f.action=$("afAction")?$("afAction").value:"";
+  f.from=$("afFrom")?$("afFrom").value:"";
+  f.to=$("afTo")?$("afTo").value:"";
+  f.q=$("afQ")?$("afQ").value.trim():"";
+  render();
+}
+function auditFilters(){
+  if(!state.ui.auditFilters)state.ui.auditFilters={user:"",action:"",from:"",to:"",q:""};
+  return state.ui.auditFilters;
+}
+function auditPrintHtml(){
+  var rows=filterAudit();
+  var title='<h1>التقارير الرقابية</h1><h2>سجل العمليات — التاريخ: '+today()+' — عدد العمليات: '+rows.length+'</h2>';
+  var head='<colgroup><col style="width:17%"><col style="width:12%"><col style="width:18%"><col style="width:11%"><col style="width:42%"></colgroup><tr><th>التاريخ والوقت</th><th>المستخدم</th><th>العملية</th><th>رقم المستند</th><th>التفاصيل</th></tr>';
+  var rs=rows.map(function(e){var du=auditDisplayUser(e);return '<tr><td>'+fmtDateTime(e.at)+'</td><td>'+esc(du.username)+' ('+esc(auditRoleLabel(du.role))+')</td><td>'+esc(auditActionLabel(e.action))+'</td><td>'+esc(e.docNo||"—")+'</td><td>'+esc(e.summary||"")+'</td></tr>';});
+  var pages=paginateRows(rs,24,0);
+  var out="";
+  pages.forEach(function(pr,i){
+    var inner=(i===0?title:"")+'<table>'+head+pr.join("")+'</table>';
+    out+=letterheadPage(inner,i+1,pages.length,"تابع التقارير الرقابية");
+  });
+  return out;
+}
+function auditUsers(){
+  var seen={};var out=[];
+  (state.audit_log||[]).forEach(function(e){var du=auditDisplayUser(e);var k=String(du.username||"");if(k&&!seen[k]){seen[k]=1;out.push({username:k,fullName:du.fullName||k});}});
+  return out;
+}
+function bankBalanceCalc(){
+  var s=state.settings[0]||{};
+  var b=Number(s.bankBalance)||0;
+  state.transactions.forEach(function(tr){if(tr.method==="بنك"&&!isCountedRevenue(tr)){if(tr.kind==="revenue")b+=Number(tr.amount)||0;else b-=Number(tr.amount)||0;}});
+  return Math.round(b*100)/100;
+}
+function buildAuditCSV(){
+  var rows=filterAudit();
+  var out=[["التقارير الرقابية — سجل العمليات"],["التاريخ والوقت","المستخدم","الاسم","الدور","العملية","الشاشة","رقم المستند","التفاصيل"]];
+  rows.forEach(function(e){var du=auditDisplayUser(e);out.push([fmtDateTime(e.at),du.username,du.fullName,auditRoleLabel(du.role),auditActionLabel(e.action),e.screen||"",e.docNo||"",e.summary||""]);});
+  return "\uFEFF"+out.map(function(r){return r.map(function(c){return '"'+String(c==null?"":c).replace(/"/g,'""')+'"';}).join(",");}).join("\r\n");
+}
+function buildItemsCSV(){
+  var rows=[["الأصناف"],["الكود","الاسم","الوحدة","سعر البيع","سعر التكلفة","الكمية"]];
+  state.items.forEach(function(it){rows.push([it.code,it.name,it.unit||"",Number(it.salePrice||0).toFixed(2),Number(it.costPrice||0).toFixed(2),String(it.qty||0)]);});
+  return toCSV(rows);
+}
+function buildStatementCSV(clientId){
+  var st=clientStatement(clientId);if(!st)return "";
+  var rows=[["كشف حساب العميل التحليلي — "+st.client.name],["التاريخ","رقم المستند","البيان","مدين","دائن","الرصيد الجاري"]];
+  st.moves.forEach(function(m){rows.push([m.date,m.doc,m.desc,m.debit?m.debit.toFixed(2):"",m.credit?m.credit.toFixed(2):"",m.balance.toFixed(2)]);});
+  rows.push(["الرصيد النهائي","","","","",st.finalBalance.toFixed(2)]);
+  return "\uFEFF"+rows.map(function(r){return r.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"';}).join(",");}).join("\r\n");
+}
+function buildTechnicianWhatsApp(projectId,technicianId){
+  var p=projectById(projectId);if(!p)return {error:"المشروع غير موجود."};
+  var t=userById(technicianId);if(!t)return {error:"الفني غير موجود."};
+  var phone=normalizePhone(t.phone);
+  if(!phone)return {error:"رقم جوال الفني «"+(t.fullName||t.username)+"» غير مسجل — سجّله من شاشة المستخدمين أولاً."};
+  var msg="لديك مهمة جديدة في نظام إدارة مشاريع المقاولات — سجّل دخولك بيوزرك لعرض المهام واعتمادها\n"+SITE_URL;
+  return {url:"https://wa.me/"+phone+"?text="+encodeURIComponent(msg),phone:phone,technicianId:t.id,projectId:p.id};
+}
+function buildTrialCSV(){
+  var tb=trialBalance();
+  var rows=[["ميزان مراجعة بحسابات العملاء"],["العميل","رصيد افتتاحي","مدين (مديونيات معتمدة بعد المرتجع)","دائن (دفعات)","رصيد ختامي"]];
+  tb.rows.forEach(function(r){rows.push([r.client.name,r.opening.toFixed(2),r.debit.toFixed(2),r.credit.toFixed(2),r.closing.toFixed(2)]);});
+  rows.push(["الإجمالي الكلي",tb.total.opening.toFixed(2),tb.total.debit.toFixed(2),tb.total.credit.toFixed(2),tb.total.closing.toFixed(2)]);
+  return "\uFEFF"+rows.map(function(r){return r.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"';}).join(",");}).join("\r\n");
+}
+function checkSetupCode(code){return String(code||"").trim()===setupCode();}
+function clearAuditFilters(){state.ui.auditFilters={user:"",action:"",from:"",to:"",q:""};render();}
+function createItem(code,name,unit,salePrice,costPrice,qty){
+  name=String(name||"").trim();if(!name)return {error:"اسم الصنف مطلوب."};
+  code=String(code||"").trim()||nextSerial("item","ITM");
+  if(itemByCode(code))return {error:"كود الصنف «"+code+"» مستخدم من قبل — أدخل كوداً آخر."};
+  var it={id:uid("it"),code:code,name:name,unit:String(unit||"").trim(),salePrice:Number(salePrice)||0,costPrice:Number(costPrice)||0,qty:Number(qty)||0,createdAt:nowISO(),updatedAt:nowISO()};
+  state.items.push(it);logAudit("create_item","إنشاء صنف جديد: "+it.code+" — "+it.name+" (سعر البيع "+fmtM(it.salePrice)+" — الكمية "+it.qty+")",it.code,"الأصناف");save();return {item:it};
+}
+function createMaterialReturn(quotationId,itemName,qty,note){
+  var q=quoteById(quotationId);if(!q)return {error:"العرض غير موجود."};
+  if(q.status!=="financial_approved")return {error:"المرتجع متاح فقط للعروض المعتمدة مالياً (التي سُجلت مديونيتها)."};
+  itemName=String(itemName||"").trim();qty=Number(qty)||0;
+  if(!itemName)return {error:"اختر المادة."};
+  if(qty<=0)return {error:"أدخل كمية مرتجعة أكبر من صفر."};
+  var issued=0;state.material_issues.forEach(function(m){if(String(m.quotationId)===String(quotationId)&&String(m.itemName)===String(itemName))issued+=Number(m.qtyIssued)||0;});
+  var max=issued-returnedQtyForItem(quotationId,itemName);
+  if(qty>max)return {error:"الكمية المرتجعة ("+qty+") أكبر من الكمية القابلة للإرجاع ("+max+") لهذه المادة."};
+  var price=quoteItemPrice(q,itemName);
+  var c=counters();c["return"]=(Number(c["return"])||0)+1;
+  var ret={id:uid("mr"),docNo:"MR-"+String(c["return"]).padStart(4,"0"),quotationId:q.id,projectId:q.projectId,clientId:q.clientId,itemName:itemName,qty:qty,unitPrice:price,amount:Math.round(qty*price*100)/100,date:today(),by:state.user?state.user.username:"—",note:String(note||"").trim(),createdAt:nowISO()};
+  state.material_returns.push(ret);
+  /* المرتجع يعيد الكمية إلى رصيد الصنف في المخزون إن كان مسجلاً. */
+  var _rit=itemByName(itemName);
+  if(_rit){_rit.qty=Number(_rit.qty||0)+qty;_rit.updatedAt=nowISO();}
+  logAudit("create_return","مرتجع مواد "+ret.docNo+": "+itemName+" ×"+qty+" بقيمة "+fmtM(ret.amount)+" — تخفيض مديونية العميل",ret.docNo,"مرتجع المواد");save();return {ret:ret};
+}
+function deleteItem(itemId){
+  var it=itemById(itemId);if(!it)return {error:"الصنف غير موجود."};
+  if(itemHasMovements(it))return {error:"لا يمكن حذف الصنف «"+it.name+"» — توجد عليه حركات (بنود عروض أسعار أو صرف/مرتجع مواد). التعديل مسموح أما الحذف فممنوع."};
+  state.items=state.items.filter(function(x){return String(x.id)!==String(itemId);});
+  logAudit("delete_item","حذف الصنف "+it.code+" — "+it.name,it.code,"الأصناف");save();return {ok:true};
+}
+function doPrintReceipt(pid){var r=printReceipt(pid);if(r.error)alert(r.error);}
+function downloadTextFile(filename,content,type){
+  try{
+    var blob=new Blob([content],{type:type||"text/plain;charset=utf-8"});
+    var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=filename;document.body.appendChild(a);a.click();
+    setTimeout(function(){try{URL.revokeObjectURL(a.href);a.remove();}catch(e){}},500);
+    return true;
+  }catch(e){return false;}
+}
+function expenseBreakdown(){
+  var cats={};
+  var mat=materialCostTotal();if(mat>0)cats["مواد منصرفة"]=mat;
+  state.transactions.forEach(function(tr){if(tr.kind==="expense"){var c2=tr.category||"مصروفات أخرى";cats[c2]=((cats[c2]||0)+Number(tr.amount)||0);}});
+  var total=0;Object.keys(cats).forEach(function(k){total+=cats[k];});
+  var rows=Object.keys(cats).map(function(k){return {name:k,amount:Math.round(cats[k]*100)/100,pct:total>0?Math.round(cats[k]/total*1000)/10:0};});
+  rows.sort(function(a,b){return b.amount-a.amount;});
+  return {rows:rows,total:Math.round(total*100)/100};
+}
+function expenseTotal(){
+  var t=materialCostTotal();
+  state.transactions.forEach(function(tr){if(tr.kind==="expense")t+=Number(tr.amount)||0;});
+  return Math.round(t*100)/100;
+}
+function exportAuditExcel(){downloadTextFile("audit-log.csv",buildAuditCSV(),"text/csv;charset=utf-8");return true;}
+function exportItemsCSV(){
+  downloadTextFile("items.csv",buildItemsCSV(),"text/csv;charset=utf-8");
+  logAudit("export_items","تصدير الأصناف إلى ملف Excel (CSV) — "+state.items.length+" صنفاً","","الأصناف");save();return true;
+}
+function exportStatementExcel(cid){if(!cid)cid=state.ui.statementClientId;var csv=buildStatementCSV(cid);if(!csv)return false;downloadTextFile("client-statement.csv",csv,"text/csv;charset=utf-8");return true;}
+function exportTrialExcel(){downloadTextFile("trial-balance.csv",buildTrialCSV(),"text/csv;charset=utf-8");return true;}
+function filterAudit(){
+  var f=auditFilters();
+  var rows=(state.audit_log||[]).slice().sort(function(a,b){return String(b.at||"").localeCompare(String(a.at||""));});
+  return rows.filter(function(e){
+    var du=auditDisplayUser(e);
+    if(f.user&&String(du.username)!==String(f.user))return false;
+    if(f.action&&e.action!==f.action)return false;
+    if(f.from&&String(e.at||"").slice(0,10)<f.from)return false;
+    if(f.to&&String(e.at||"").slice(0,10)>f.to)return false;
+    if(f.q){var s=(e.summary||"")+" "+(e.docNo||"")+" "+(du.username||"")+" "+(du.fullName||"")+" "+auditActionLabel(e.action);if(s.indexOf(f.q)<0)return false;}
+    return true;
+  });
+}
+function importItemsCSV(text){
+  var t=String(text||"").replace(/^\uFEFF/,"").replace(/\r\n/g,"\n").replace(/\r/g,"\n");
+  var lines=t.split("\n");
+  var imported=0,duplicated=0,rejected=0;
+  lines.forEach(function(line){
+    if(!String(line).trim())return;
+    var cells=parseCSVLine(line);
+    var code=String(cells[0]||"").trim();
+    var name=String(cells[1]||"").trim();
+    if(!code&&!name)return;
+    var lc0=code.toLowerCase(),lc1=name.toLowerCase();
+    if(lc0==="الكود"||lc0==="code"||lc1==="الاسم"||lc1==="name")return; /* صف الترويسة */
+    if(!name){rejected++;return;}
+    if(code&&itemByCode(code)){duplicated++;return;}
+    var r=createItem(code,name,String(cells[2]||"").trim(),cells[3],cells[4],cells[5]);
+    if(r.error){if(r.error.indexOf("مستخدم من قبل")>=0)duplicated++;else rejected++;}
+    else imported++;
+  });
+  logAudit("import_items","استيراد أصناف من ملف Excel (CSV): مستورد "+imported+" — مكرر "+duplicated+" — مرفوض "+rejected,"","الأصناف");
+  save();
+  return {imported:imported,duplicated:duplicated,rejected:rejected};
+}
+function isCountedRevenue(tr){return tr.kind==="revenue"&&tr.paymentDocNo;}
+function itemByCode(code){code=String(code||"").trim();if(!code)return null;for(var i=0;i<state.items.length;i++)if(String(state.items[i].code)===String(code))return state.items[i];return null;}
+function itemById(id){for(var i=0;i<state.items.length;i++)if(String(state.items[i].id)===String(id))return state.items[i];return null;}
+function itemByName(name){name=String(name||"").trim();if(!name)return null;for(var i=0;i<state.items.length;i++)if(String(state.items[i].name).trim()===name)return state.items[i];return null;}
+function itemHasMovements(item){
+  var name=String(item.name||"").trim();
+  if(!name)return false;
+  for(var i=0;i<state.quotations.length;i++){var q=state.quotations[i];for(var j=0;j<(q.items||[]).length;j++)if(String(q.items[j].name).trim()===name)return true;}
+  for(var k=0;k<state.material_issues.length;k++)if(String(state.material_issues[k].itemName).trim()===name)return true;
+  for(var m=0;m<state.material_returns.length;m++)if(String(state.material_returns[m].itemName).trim()===name)return true;
+  return false;
+}
+function letterheadPage(inner,pageNo,totalPages,continued,dense){
+  var h='<div class="print-page"><div class="print-content'+(dense?" dense":"")+'">';
+  if(pageNo>1&&continued)h+='<p class="cont-line">'+esc(continued)+' — صفحة '+pageNo+' من '+totalPages+'</p>';
+  h+=inner+'</div></div>';
+  return h;
+}
+function materialCostTotal(){
+  var t=0;
+  state.material_issues.forEach(function(m){
+    var q=quoteById(m.quotationId);if(!q||q.status!=="financial_approved")return;
+    t+=(Number(m.qtyIssued)||0)*quoteItemPrice(q,m.itemName);
+  });
+  return Math.round(t*100)/100;
+}
+function monthKey(d){return String(d||"").slice(0,7);}
+function monthLabel(ym){var parts=String(ym).split("-");var months=["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];var m=Number(parts[1]);return (months[m-1]||"")+" "+(parts[0]||"");}
+function normalizePhone(raw){
+  var phone=String(raw||"").replace(/[^0-9]/g,"");
+  if(phone.length===10&&phone.charAt(0)==="0")phone="966"+phone.slice(1);
+  return phone;
+}
+function paginateRows(rows,perPage,footRows){
+  var pages=[];var cur=[];
+  rows.forEach(function(r){cur.push(r);if(cur.length>=perPage){pages.push(cur);cur=[];}});
+  if(cur.length)pages.push(cur);
+  if(!pages.length)pages.push([]);
+  if(footRows&&pages.length){
+    var last=pages[pages.length-1];
+    if(last.length>perPage-footRows){var mv=last.splice(perPage-footRows);pages.push(mv);}
+  }
+  return pages;
+}
+function parseCSVLine(line){
+  var out=[],cur="",inq=false;
+  for(var i=0;i<line.length;i++){var ch=line[i];
+    if(inq){if(ch==='"'){if(line[i+1]==='"'){cur+='"';i++;}else inq=false;}else cur+=ch;}
+    else if(ch==='"')inq=true;
+    else if(ch===','){out.push(cur);cur="";}
+    else cur+=ch;}
+  out.push(cur);return out;
+}
+function printAuditReport(){logAudit("print_report","طباعة/تصدير PDF للتقارير الرقابية — "+filterAudit().length+" عملية معروضة","","التقارير الرقابية");save();printHtml(auditPrintHtml());return true;}
+function printHtml(html){
+  var area=document.getElementById("printArea");
+  if(!area){area=document.createElement("div");area.id="printArea";document.body.appendChild(area);}
+  area.innerHTML=html;
+  if(typeof window!=="undefined"&&typeof window.print==="function"){try{window.print();}catch(e){}}
+  return area.innerHTML;
+}
+function printQuotation(qid){var q=quoteById(qid);if(!q)return {error:"العرض غير موجود."};printHtml(quotePrintHtml(q));return {ok:true};}
+function printReceipt(payId){
+  var pay=null;for(var i=0;i<state.payments.length;i++)if(String(state.payments[i].id)===String(payId))pay=state.payments[i];
+  if(!pay)return {error:"الدفعة غير موجودة."};
+  printHtml(receiptPrintHtml(pay));return {ok:true};
+}
+function printStatementReport(cid){if(!cid)cid=state.ui.statementClientId;var h=statementPrintHtml(cid);if(!h)return false;printHtml(h);return true;}
+function printTrialReport(){printHtml(trialPrintHtml());return true;}
+function quoteItemPrice(q,itemName){if(!q||!q.items)return 0;for(var i=0;i<q.items.length;i++)if(String(q.items[i].name)===String(itemName))return Number(q.items[i].price)||0;return 0;}
+function quotePrintHtml(q){
+  var p=projectById(q.projectId);var cl=clientById(q.clientId);
+  var ret=returnsTotalForQuotation(q.id);
+  var dense=q.items.length>17;
+  var perPage=dense?36:20;
+  var s0=state.settings[0]||{};
+  var title='<h1>عرض سعر</h1><h2>رقم '+esc(q.number)+' — التاريخ: '+fmtDate(q.createdAt)+'</h2>'+
+  (s0.taxNumber?'<p>الرقم الضريبي: <span dir="ltr">'+esc(s0.taxNumber)+'</span></p>':"")+
+  '<p>العميل: '+esc(cl?cl.name:"")+' — الجوال: <span dir="ltr">'+esc(cl?cl.phone||"":"")+'</span>'+(cl&&cl.taxNumber?' — الرقم الضريبي: <span dir="ltr">'+esc(cl.taxNumber)+'</span>':"")+' — المشروع: '+(p?esc(p.number)+" — "+esc(p.title):"")+'</p>';
+  var head='<colgroup><col style="width:5%"><col style="width:50%"><col style="width:10%"><col style="width:10%"><col style="width:12%"><col style="width:13%"></colgroup>'+
+  '<tr><th>الرقم</th><th>بيان الأعمال</th><th>الوحدة</th><th>الكمية</th><th>السعر الإفرادي</th><th>السعر الإجمالي</th></tr>';
+  var rows=q.items.map(function(it,i){return '<tr><td>'+(i+1)+'</td><td>'+esc(it.name)+'</td><td>'+esc(it.unit||"—")+'</td><td>'+it.qty+'</td><td>'+fmtM(it.price)+'</td><td>'+fmtM(it.qty*it.price)+'</td></tr>';});
+  var foot='<p>المجموع الفرعي: '+fmtM(q.subtotal)+' — الضريبة (15%): '+fmtM(q.vat)+' — <b>الإجمالي: '+fmtM(q.total)+'</b></p>';
+  if(q.maintenance&&q.maintenance.included)foot+='<p>يشمل عقد صيانة: '+esc(q.maintenance.type)+' — '+fmtM(q.maintenance.amount)+' — '+esc(q.maintenance.duration)+'</p>';
+  if(ret>0){foot+='<p>مرتجع مواد: '+fmtM(ret)+' — <b>صافي العرض بعد المرتجع: '+fmtM(q.total-ret)+'</b></p>';
+    foot+='<table><tr><th>المادة المرتجعة</th><th>الكمية</th><th>القيمة</th></tr>';
+    returnsForQuotation(q.id).forEach(function(r){foot+='<tr><td>'+esc(r.itemName)+'</td><td>'+r.qty+'</td><td>'+fmtM(r.amount)+'</td></tr>';});
+    foot+='</table>';}
+  foot+='<p style="margin-top:24px">توقيع العميل: .................... &nbsp;&nbsp; توقيع المدير: ....................</p>';
+  var pages=paginateRows(rows,perPage,6);
+  var out="";
+  pages.forEach(function(rs,i){
+    var inner=(i===0?title:"")+'<table>'+head+rs.join("")+'</table>'+(i===pages.length-1?foot:"");
+    out+=letterheadPage(inner,i+1,pages.length,"تابع عرض السعر رقم "+q.number,dense);
+  });
+  return out;
+}
+function receiptPrintHtml(pay){
+  var cl=clientById(pay.clientId);
+  var inner='<h1>سند قبض</h1><h2>رقم السند: '+esc(pay.docNo)+' — التاريخ: '+esc(pay.date)+'</h2>'+
+  '<table><tr><th style="width:30%">البيان</th><th>التفاصيل</th></tr>'+
+  '<tr><td>العميل</td><td>'+esc(cl?cl.name:"")+'</td></tr>'+
+  '<tr><td>نوع الدفعة</td><td>'+(pay.kind==="advance"?"دفعة مقدمة":"دفعة سداد")+'</td></tr>'+
+  '<tr><td>المبلغ</td><td><b>'+fmtM(pay.amount)+' '+esc((state.settings[0]||{}).currency||"ر.س")+'</b></td></tr>'+
+  '<tr><td>ملاحظة</td><td>'+esc(pay.note||"—")+'</td></tr>'+
+  '<tr><td>سُجل بواسطة</td><td>'+esc(pay.by||"—")+'</td></tr></table>'+
+  '<p style="margin-top:28px">توقيع المحاسب: .................... &nbsp;&nbsp; توقيع العميل: ....................</p>';
+  return letterheadPage(inner,1,1,"");
+}
+function recordTransaction(kind,amount,category,method,description,clientId){
+  amount=Number(amount)||0;
+  if(kind!=="revenue"&&kind!=="expense")return {error:"نوع الحركة غير صحيح."};
+  if(amount<=0)return {error:"أدخل مبلغاً أكبر من صفر."};
+  var c=counters();c.transaction=(Number(c.transaction)||0)+1;
+  var tr={id:uid("tr"),docNo:"TR-"+String(c.transaction).padStart(4,"0"),kind:kind,amount:amount,category:String(category||"").trim()||(kind==="revenue"?"إيراد":"مصروف"),method:method==="بنك"?"بنك":"نقدي",description:String(description||"").trim(),clientId:clientId||null,date:today(),by:state.user?state.user.username:"—",createdAt:nowISO()};
+  state.transactions.push(tr);
+  if(kind==="revenue"&&clientId){
+    var pr=recordPayment(clientId,"payment",amount,description||"إيراد مسجل من إدارة الحسابات",null,true);
+    if(pr.error){state.transactions.pop();return pr;}
+    tr.paymentDocNo=pr.payment.docNo;
+  }
+  logAudit("record_transaction","تسجيل "+(kind==="revenue"?"إيراد":"مصروف")+" "+tr.docNo+" بمبلغ "+fmtM(amount)+" — "+tr.category,tr.docNo,"إدارة الحسابات");save();return {transaction:tr};
+}
+function returnedQtyForItem(qid,itemName){var q=0;returnsForQuotation(qid).forEach(function(r){if(String(r.itemName)===String(itemName))q+=Number(r.qty)||0;});return q;}
+function returnsForQuotation(qid){return state.material_returns.filter(function(r){return String(r.quotationId)===String(qid);});}
+function returnsTotalForQuotation(qid){var t=0;returnsForQuotation(qid).forEach(function(r){t+=Number(r.amount)||0;});return Math.round(t*100)/100;}
+function revenueTotal(){
+  var t=0;state.payments.forEach(function(p){t+=Number(p.amount)||0;});
+  state.transactions.forEach(function(tr){if(tr.kind==="revenue"&&!isCountedRevenue(tr))t+=Number(tr.amount)||0;});
+  return Math.round(t*100)/100;
+}
+function safeBalanceCalc(){
+  var s=state.settings[0]||{};
+  var b=Number(s.safeBalance)||0;
+  state.payments.forEach(function(p){b+=Number(p.amount)||0;});
+  state.transactions.forEach(function(tr){if(tr.method!=="بنك"&&!isCountedRevenue(tr)){if(tr.kind==="revenue")b+=Number(tr.amount)||0;else b-=Number(tr.amount)||0;}});
+  b-=materialCostTotal();
+  return Math.round(b*100)/100;
+}
+function saveSetupSettings(fields){
+  var s=state.settings[0];if(!s){state.settings=[{id:"main"}];s=state.settings[0];}
+  if(fields.companyName!==undefined)s.companyName=String(fields.companyName);
+  if(fields.companyNameEn!==undefined)s.companyNameEn=String(fields.companyNameEn);
+  if(fields.commercialReg!==undefined)s.commercialReg=String(fields.commercialReg);
+  if(fields.address!==undefined)s.address=String(fields.address);
+  if(fields.phones!==undefined)s.phones=String(fields.phones);
+  if(fields.email!==undefined)s.email=String(fields.email);
+  if(fields.currency!==undefined)s.currency=String(fields.currency);
+  if(fields.vatRate!==undefined)s.vatRate=Number(fields.vatRate)||15;
+  if(fields.bankBalance!==undefined)s.bankBalance=Number(fields.bankBalance)||0;
+  if(fields.safeBalance!==undefined)s.safeBalance=Number(fields.safeBalance)||0;
+  if(fields.ownerName!==undefined)s.ownerName=String(fields.ownerName);
+  if(fields.ownerPhone!==undefined)s.ownerPhone=String(fields.ownerPhone);
+  if(fields.taxNumber!==undefined)s.taxNumber=String(fields.taxNumber);
+  if(fields.city!==undefined)s.city=String(fields.city);
+  if(fields.district!==undefined)s.district=String(fields.district);
+  if(fields.street!==undefined)s.street=String(fields.street);
+  if(fields.buildingNo!==undefined)s.buildingNo=String(fields.buildingNo);
+  if(fields.postalCode!==undefined)s.postalCode=String(fields.postalCode);
+  if(fields.subNumber!==undefined)s.subNumber=String(fields.subNumber);
+  if(fields.newCode!==undefined&&String(fields.newCode).trim()){
+    if(String(fields.newCode).trim().length<4)return {error:"رمز التهيئة يجب أن يكون 4 أرقام على الأقل."};
+    s.setupCode=String(fields.newCode).trim();
+  }
+  logAudit("save_setup","حفظ تهيئة النظام (بيانات الشركة والأرصدة الافتتاحية"+(fields.newCode?" وتغيير رمز التهيئة":"")+")","","الإعدادات");save();return {settings:s};
+}
+function screenAudit(){
+  var f=auditFilters();
+  var rows=filterAudit();
+  var h='<div class="card"><h2>التقارير الرقابية</h2>'+
+  '<p class="muted">كل العمليات التي تمت في النظام من أي مستخدم، بالتاريخ والوقت — من تسجيل الدخول إلى الخروج. السجل محمي: لا يمكن حذف سجلاته من الواجهة، ولا يُشمل في النسخة الاحتياطية، ولا يُستبدل عند استرجاع نسخة، ولا يُمسح عند تصفير البيانات إلا بطلب صريح من المستخدم.</p>'+
+  '<div class="form-grid">'+
+  '<div><label>المستخدم</label><select id="afUser" class="inp"><option value="">— كل المستخدمين —</option>'+auditUsers().map(function(u){return '<option value="'+esc(u.username)+'"'+(f.user===u.username?" selected":"")+'>'+esc(u.fullName)+' ('+esc(u.username)+')</option>';}).join("")+'</select></div>'+
+  '<div><label>نوع العملية</label><select id="afAction" class="inp"><option value="">— كل العمليات —</option>'+Object.keys(AUDIT_ACTIONS).map(function(k){return '<option value="'+k+'"'+(f.action===k?" selected":"")+'>'+esc(AUDIT_ACTIONS[k])+'</option>';}).join("")+'</select></div>'+
+  '<div><label>من تاريخ</label><input id="afFrom" type="date" class="inp" value="'+esc(f.from)+'"></div>'+
+  '<div><label>إلى تاريخ</label><input id="afTo" type="date" class="inp" value="'+esc(f.to)+'"></div>'+
+  '<div><label>بحث نصي</label><input id="afQ" class="inp" placeholder="ابحث في التفاصيل أو المستند أو المستخدم" value="'+esc(f.q)+'"></div></div>'+
+  '<div class="row" style="margin-top:.6rem"><button type="button" class="btn btn-navy btn-sm" onclick="applyAuditFilters()">تطبيق الفلاتر</button>'+
+  '<button type="button" class="btn btn-ghost btn-sm" onclick="clearAuditFilters()">مسح الفلاتر</button>'+
+  '<button type="button" class="btn btn-gold btn-sm" onclick="exportAuditExcel()">تصدير Excel</button>'+
+  '<button type="button" class="btn btn-navy btn-sm" onclick="printAuditReport()">تصدير PDF (طباعة)</button></div>'+
+  '<p class="muted">تصدير PDF يتم عبر نافذة الطباعة — اختر «حفظ كـ PDF» من متصفحك.</p>'+
+  '<p><b>عدد العمليات المعروضة: <span class="num">'+rows.length+'</span></b> من أصل <span class="num">'+((state.audit_log||[]).length)+'</span></p>';
+  if(!rows.length)h+='<p class="muted">لا توجد عمليات مطابقة للفلاتر.</p>';
+  else{
+    h+='<table><tr><th>التاريخ والوقت</th><th>المستخدم</th><th>العملية</th><th>الشاشة</th><th>رقم المستند</th><th>التفاصيل</th></tr>';
+    rows.forEach(function(e){
+      var du=auditDisplayUser(e);
+      h+='<tr><td class="num">'+fmtDateTime(e.at)+'</td><td>'+esc(du.fullName)+' ('+esc(du.username)+')</td><td>'+esc(auditActionLabel(e.action))+'</td><td>'+esc(e.screen||"—")+'</td><td class="num">'+esc(e.docNo||"—")+'</td><td>'+esc(e.summary||"")+'</td></tr>';
+    });
+    h+='</table>';
+  }
+  return h+'</div>';
+}
+function searchItems(q){
+  q=String(q||"").trim();
+  if(!q)return state.items.slice();
+  return state.items.filter(function(it){return String(it.name||"").indexOf(q)>=0||String(it.code||"").indexOf(q)>=0;});
+}
+function sendQuoteWhatsApp(qid){
+  var r=waLinkForQuote(qid);
+  if(!r)return {error:"العرض غير موجود."};
+  if(r.error)return r;
+  if(typeof window!=="undefined"&&window.open){try{window.open(r.url,"_blank");}catch(e){}}
+  return r;
+}
+function sendTechnicianWhatsApp(projectId,technicianId){
+  var r=buildTechnicianWhatsApp(projectId,technicianId);
+  if(!r||r.error)return r||{error:"تعذّر بناء رابط الواتساب."};
+  var t=userById(technicianId),p=projectById(projectId);
+  logAudit("assign_whatsapp","إرسال واتساب للفني "+(t?t.fullName||t.username:"")+" — المشروع "+(p?p.number:""),"","إدارة المشاريع");
+  save();
+  if(typeof window!=="undefined"&&window.open){try{window.open(r.url,"_blank");}catch(e){}}
+  return r;
+}
+function setupCode(){var s=state.settings[0];return (s&&s.setupCode)?String(s.setupCode):"1805";}
+function statementPrintHtml(clientId){
+  var st=clientStatement(clientId);if(!st)return "";
+  var s0=state.settings[0]||{};
+  var taxLine="";
+  if(s0.taxNumber)taxLine+='<p>الرقم الضريبي للشركة: <span dir="ltr">'+esc(s0.taxNumber)+'</span></p>';
+  if(st.client.taxNumber)taxLine+='<p>الرقم الضريبي للعميل: <span dir="ltr">'+esc(st.client.taxNumber)+'</span></p>';
+  var title='<h1>كشف حساب العميل التحليلي</h1><h2>'+esc(st.client.name)+' — التاريخ: '+today()+'</h2>'+taxLine;
+  var head='<colgroup><col style="width:12%"><col style="width:13%"><col style="width:41%"><col style="width:11%"><col style="width:11%"><col style="width:12%"></colgroup><tr><th>التاريخ</th><th>رقم المستند</th><th>البيان</th><th>مدين</th><th>دائن</th><th>الرصيد الجاري</th></tr>';
+  var rows=st.moves.map(function(m){return '<tr><td>'+esc(m.date)+'</td><td>'+esc(m.doc)+'</td><td>'+esc(m.desc)+'</td><td>'+(m.debit?fmtM(m.debit):"—")+'</td><td>'+(m.credit?fmtM(m.credit):"—")+'</td><td>'+fmtM(m.balance)+'</td></tr>';});
+  var foot='<p><b>الرصيد النهائي: '+fmtM(st.finalBalance)+'</b></p>';
+  var pages=paginateRows(rows,24,2);
+  var out="";
+  pages.forEach(function(rs,i){
+    var inner=(i===0?title:"")+'<table>'+head+rs.join("")+'</table>'+(i===pages.length-1?foot:"");
+    out+=letterheadPage(inner,i+1,pages.length,"تابع كشف حساب العميل "+st.client.name);
+  });
+  return out;
+}
+function toCSV(rows){
+  return "\uFEFF"+rows.map(function(r){return r.map(function(c){return '"'+String(c==null?"":c).replace(/"/g,'""')+'"';}).join(",");}).join("\r\n");
+}
+function trialPrintHtml(){
+  var tb=trialBalance();
+  var title='<h1>ميزان مراجعة بحسابات العملاء</h1><h2>التاريخ: '+today()+'</h2>';
+  var head='<colgroup><col style="width:40%"><col style="width:15%"><col style="width:15%"><col style="width:15%"><col style="width:15%"></colgroup><tr><th>العميل</th><th>رصيد افتتاحي</th><th>مدين</th><th>دائن</th><th>رصيد ختامي</th></tr>';
+  var rows=tb.rows.map(function(r){return '<tr><td>'+esc(r.client.name)+'</td><td>'+fmtM(r.opening)+'</td><td>'+fmtM(r.debit)+'</td><td>'+fmtM(r.credit)+'</td><td>'+fmtM(r.closing)+'</td></tr>';});
+  var foot='<tr><td><b>الإجمالي الكلي</b></td><td><b>'+fmtM(tb.total.opening)+'</b></td><td><b>'+fmtM(tb.total.debit)+'</b></td><td><b>'+fmtM(tb.total.credit)+'</b></td><td><b>'+fmtM(tb.total.closing)+'</b></td></tr>';
+  var pages=paginateRows(rows,24,1);
+  var out="";
+  pages.forEach(function(rs,i){
+    var inner=(i===0?title:"")+'<table>'+head+rs.join("")+(i===pages.length-1?foot:"")+'</table>';
+    out+=letterheadPage(inner,i+1,pages.length,"تابع ميزان المراجعة");
+  });
+  return out;
+}
+function updateItem(itemId,fields){
+  var it=itemById(itemId);if(!it)return {error:"الصنف غير موجود."};
+  if(fields.name!==undefined&&String(fields.name).trim())it.name=String(fields.name).trim();
+  if(fields.code!==undefined){var nc=String(fields.code).trim();if(nc&&nc!==it.code&&itemByCode(nc))return {error:"كود الصنف «"+nc+"» مستخدم من قبل."};if(nc)it.code=nc;}
+  if(fields.unit!==undefined)it.unit=String(fields.unit||"").trim();
+  if(fields.salePrice!==undefined)it.salePrice=Number(fields.salePrice)||0;
+  if(fields.costPrice!==undefined)it.costPrice=Number(fields.costPrice)||0;
+  if(fields.qty!==undefined)it.qty=Number(fields.qty)||0;
+  it.updatedAt=nowISO();
+  logAudit("update_item","تعديل الصنف "+it.code+" — "+it.name,it.code,"الأصناف");save();return {item:it};
+}
+function waLinkForQuote(qid){
+  var q=quoteById(qid);if(!q)return null;
+  var cl=clientById(q.clientId);var phone=normalizePhone(cl?cl.phone||"":"");
+  if(!phone)return {error:"رقم جوال العميل غير مسجل."};
+  var p=projectById(q.projectId);
+  var items=q.items.map(function(it){return it.name+" ×"+it.qty;}).join("، ");
+  var msg="السلام عليكم، عرض السعر رقم "+q.number+" — المشروع: "+(p?p.title:"")+" — المواد: "+items+" — الإجمالي شامل الضريبة: "+fmtM(q.total)+" "+((state.settings[0]||{}).currency||"ر.س");
+  return {url:"https://wa.me/"+phone+"?text="+encodeURIComponent(msg),phone:phone};
 }
 </script>
 <script>
@@ -1426,7 +1389,7 @@ function renderLogin(){
   '<div class="pw-wrap"><input id="loginPass" type="password" class="inp" autocomplete="current-password" placeholder="كلمة المرور" onkeydown="loginKey(event,\'pass\')">'+
   '<button type="button" class="eye" onclick="togglePw()" title="إظهار / إخفاء كلمة المرور">👁</button></div>'+
   '<div style="margin-top:1rem"><button type="button" class="btn btn-navy" onclick="doLogin()">دخول</button></div>'+
-  '<p class="muted" style="margin-top:1rem;line-height:1.7">الدخول الأول لمدير النظام: اسم المستخدم <b class="num">1</b> وكلمة المرور <b class="num">1</b>. لا يوجد تسجيل من هذه الشاشة — إنشاء المستخدمين يتم من داخل النظام بواسطة مدير النظام فقط.</p>'+
+  '<p class="muted" style="margin-top:1rem;line-height:1.7">الدخول الأول لمدير النظام: اسم المستخدم <b class="num">1</b> وكلمة المرور <b class="num">1</b>. لا يوجد تسجيل من هذه الشاشة — إنشاء المستخدمين يتم من داخل النظام بواسطة مدير النظام أو الحسابات.</p>'+
   '<p id="loginModeNote" class="muted" style="line-height:1.7"></p>'+
   '</div></div>';
   syncNote();
@@ -1591,7 +1554,6 @@ function doAssign(pid){
     if(!w0.error&&confirm("تم الإسناد. هل تريد فتح واتساب للفني "+r.assigned[0].technicianName+" الآن لإرسال إشعار بوجود مهمة؟"))sendTechnicianWhatsApp(pid,r.assigned[0].technicianId);
   }
 }
-function doWaTechnician(pid,tid){var r=sendTechnicianWhatsApp(pid,tid);if(r&&r.error)alert(r.error);}
 function showInspect(pid){
   var p=projectById(pid);if(!p)return;
   var media=state.media.filter(function(m){return String(m.projectId)===String(pid);});
@@ -1642,6 +1604,8 @@ function doAddProject(){
   if(r.error){if(m)m.innerHTML='<div class="err">'+esc(r.error)+'</div>';return;}
   render();var m2=$("projMsg");if(m2)m2.innerHTML='<div class="okbox">تم حفظ المشروع رقم '+esc(r.project.number)+'.</div>';
 }
+
+function doWaTechnician(pid,tid){var r=sendTechnicianWhatsApp(pid,tid);if(r&&r.error)alert(r.error);}
 </script>
 <script>
 /* ---------- شاشة مهامي (الفني — تعمل على الجوال) ---------- */
@@ -1703,73 +1667,6 @@ function handleMediaFile(pid,input,kind){
   rd.onerror=function(){alert("تعذّرت قراءة الصورة.");};
   rd.readAsDataURL(f);
 }
-/* ---------- نافذة اختيار الأصناف (F9) والإكمال التلقائي ----------
-   تُستخدم في شاشة الأصناف وفي حقل اسم الصنف ببنود عروض الأسعار.
-   target: {kind:"form"} لنموذج الأصناف، أو {kind:"quote",line:i} لبند عرض.
-   النافذة تُبنى في DOM مباشرة دون render() حتى لا تضيع القيم المكتوبة. */
-function itemPickRowHtml(it){
-  return '<div class="item-pick-row" data-item-id="'+esc(it.id)+'"><b>'+esc(it.code)+'</b> — '+esc(it.name)+' <span class="muted">('+(esc(it.unit||"—"))+' — المتاح: '+it.qty+' — سعر البيع: '+fmtM(it.salePrice)+')</span></div>';
-}
-function bindItemPickRows(container,target){
-  if(!container)return;
-  container.querySelectorAll(".item-pick-row").forEach(function(row){
-    row.addEventListener("click",function(){var it=itemById(row.getAttribute("data-item-id"));pickItem(it,target);});
-  });
-}
-function closeItemPicker(){var m=$("itemPickerModal");if(m)m.remove();}
-function closeItemSuggest(){var d=$("itemPickerDrop");if(d)d.remove();}
-function openItemPicker(target){
-  closeItemPicker();closeItemSuggest();
-  var overlay=document.createElement("div");
-  overlay.id="itemPickerModal";
-  overlay.className="item-modal";
-  var rows=state.items.map(function(it){return itemPickRowHtml(it);}).join("");
-  overlay.innerHTML='<div class="item-modal-card"><h3>اختر صنفاً</h3>'+
-    '<input id="itemPickerSearch" class="inp" placeholder="ابحث بالاسم أو الكود…" oninput="itemPickerSearchInput(this)">'+
-    '<div id="itemPickerList" style="max-height:300px;overflow:auto;margin-top:.5rem">'+(rows||'<p class="muted">لا توجد أصناف مسجلة بعد — سجّلها من شاشة الأصناف.</p>')+'</div>'+
-    '<div class="row" style="margin-top:.6rem"><button type="button" class="btn btn-ghost" onclick="closeItemPicker()">إغلاق (Esc)</button></div></div>';
-  document.body.appendChild(overlay);
-  state.ui.itemPickerTarget=target;
-  bindItemPickRows(overlay,target);
-  var s=$("itemPickerSearch");if(s)try{s.focus();}catch(e){}
-}
-function itemPickerSearchInput(el){
-  var list=$("itemPickerList");if(!list)return;
-  var rows=searchItems(el.value).map(function(it){return itemPickRowHtml(it);}).join("");
-  list.innerHTML=rows||'<p class="muted">لا توجد أصناف مطابقة.</p>';
-  bindItemPickRows(list,state.ui.itemPickerTarget);
-}
-function pickItem(it,target){
-  if(!it)return;
-  closeItemPicker();closeItemSuggest();
-  if(target&&target.kind==="quote"){
-    var ls=qLines();var l=ls[target.line];if(!l)return;
-    l.name=it.name;l.price=it.salePrice;l.unit=it.unit||"";l.itemId=it.id;l.availQty=it.qty;
-    render();
-  }else if(target&&target.kind==="form"){
-    /* اختيار صنف في نموذج الأصناف يفتح وضع تعديله ببياناته كاملة. */
-    state.ui.editItemId=it.id;
-    render();
-  }else if(target&&target.el){
-    target.el.value=it.name;
-  }
-}
-function itemPickerKey(e,inputEl,target){
-  if(e&&e.key==="F9"){e.preventDefault();openItemPicker(target);return;}
-  if(e&&e.key==="Escape"){closeItemPicker();closeItemSuggest();}
-}
-function itemPickerInput(inputEl,target){
-  closeItemSuggest();
-  var q=String(inputEl.value||"").trim();
-  if(q.length<1)return;
-  var matches=searchItems(q).slice(0,8);
-  if(!matches.length)return;
-  var d=document.createElement("div");
-  d.id="itemPickerDrop";d.className="item-suggest";
-  d.innerHTML=matches.map(function(it){return itemPickRowHtml(it);}).join("");
-  if(inputEl.parentElement)inputEl.parentElement.appendChild(d);else document.body.appendChild(d);
-  bindItemPickRows(d,target);
-}
 /* ---------- عروض الأسعار ---------- */
 function qLineRow(i,l){
   var avail=(l.itemId&&l.availQty!==undefined)?'<div class="muted">الوحدة: '+esc(l.unit||"—")+' — المتاح: '+l.availQty+'</div>':(l.unit?'<div class="muted">الوحدة: '+esc(l.unit)+'</div>':"");
@@ -1780,13 +1677,6 @@ function qLineRow(i,l){
 }
 function qLines(){if(!state.ui.qLines)state.ui.qLines=[{name:"",qty:1,price:""},{name:"",qty:1,price:""}];return state.ui.qLines;}
 function qLineChange(i,f,v){var ls=qLines();if(!ls[i])return;if(f==="name"){ls[i].name=v;ls[i].itemId=null;ls[i].unit="";ls[i].availQty=undefined;}else ls[i][f]=v;render();}
-/* حالة عقد الصيانة في نموذج العرض: تُحفظ في state.ui.qMaint فور
-   تغييرها، فتبقى بعد كل إعادة رسم (إضافة بند، كتابة اسم صنف...).
-   العطل السابق: الزر كان onchange="render()" بلا حفظ — كل إعادة رسم
-   كانت تعيد بناء النموذج والزر غير مفعّل وتضيع القيم المكتوبة. */
-function qMaintState(){if(!state.ui.qMaint)state.ui.qMaint={included:false,type:CONTRACT_TYPES[0],amount:0,duration:""};return state.ui.qMaint;}
-function qMaintToggle(on){var qm=qMaintState();qm.included=!!on;render();}
-function qMaintField(f,v){var qm=qMaintState();if(f==="amount")qm.amount=Number(v)||0;else qm[f]=v;}
 function qAddLine(){qLines().push({name:"",qty:1,price:""});render();}
 function screenQuotations(){
   var inspected=state.projects.filter(function(p){return p.status==="inspected"||p.status==="quoted"||p.status==="client_accepted"||p.status==="gm_approved"||p.status==="approved";});
@@ -1835,8 +1725,6 @@ function screenQuotations(){
   }
   return h+'</div>';
 }
-function doPrintQuote(qid){var r=printQuotation(qid);if(r.error){alert(r.error);return;}var q=quoteById(qid);logAudit("print_quotation","طباعة عرض السعر "+(q?q.number:""),q?q.number:"","عروض الأسعار");save();}
-function doWaQuote(qid){var r=sendQuoteWhatsApp(qid);if(r&&r.error)alert(r.error);}
 function doCreateQuote(){
   var pid=$("qProject").value;
   var qm=qMaintState();
@@ -1856,71 +1744,6 @@ function doClientResp(qid,dec){
   if(r.error){alert(r.error);return;}
   render();
 }
-/* ---------- الأصناف (شاشة) ---------- */
-function itemTableHtml(){
-  var list=searchItems(state.ui.itemFilter||"");
-  var h="";
-  if(!list.length)h='<p class="muted">لا توجد أصناف مطابقة.</p>';
-  else{
-    h='<table><tr><th>الكود</th><th>الاسم</th><th>الوحدة</th><th>سعر البيع</th><th>سعر التكلفة</th><th>الكمية (رصيد المخزون)</th><th>إجراءات</th></tr>';
-    list.forEach(function(it){
-      h+='<tr><td class="num">'+esc(it.code)+'</td><td>'+esc(it.name)+'</td><td>'+esc(it.unit||"—")+'</td><td class="num">'+fmtM(it.salePrice)+'</td><td class="num">'+fmtM(it.costPrice)+'</td><td class="num">'+it.qty+'</td><td>'+
-      '<button type="button" class="btn btn-ghost btn-sm" onclick="showEditItem(\''+it.id+'\')">تعديل</button> '+
-      '<button type="button" class="btn btn-danger btn-sm" onclick="delItem(\''+it.id+'\')">حذف</button></td></tr>';
-    });
-    h+='</table>';
-  }
-  return h;
-}
-function renderItemTable(){var b=$("itTableBox");if(b)b.innerHTML=itemTableHtml();}
-function applyItemFilter(v){state.ui.itemFilter=v;renderItemTable();}
-function screenItems(){
-  var ei=state.ui.editItemId?itemById(state.ui.editItemId):null;
-  var h='<div class="card"><h2>الأصناف</h2><p class="muted">سجّل أصناف المواد مع الوحدة وأسعار البيع والتكلفة والكمية — تُستخدم في بنود عروض الأسعار (F9 أو الكتابة لاختيار صنف فيملأ السعر والوحدة). الكمية هي رصيد المخزون: تُخصم عند صرف المواد وتُعاد عند المرتجع. الحذف مسموح فقط للصنف الذي لم تُسجَّل عليه أي حركة إطلاقاً؛ إن كانت عليه حركات يُمنع حذفه برسالة واضحة ويبقى التعديل مسموحاً.</p><div id="itMsg"></div>';
-  h+='<h3>'+(ei?"تعديل الصنف «"+esc(ei.name)+"»":"إضافة صنف جديد")+'</h3><div class="form-grid">'+
-  '<div><label>الكود (تلقائي، قابل للتعديل، لا يتكرر)</label><input id="niCode" class="inp num" value="'+(ei?esc(ei.code):esc(peekSerial("item","ITM")))+'" onkeydown="itemPickerKey(event,this,{kind:\'form\'})" oninput="itemPickerInput(this,{kind:\'form\'})"></div>'+
-  '<div><label>اسم الصنف *</label><input id="niName" class="inp" value="'+(ei?esc(ei.name):"")+'" placeholder="اكتب جزءاً من الاسم أو اضغط F9" onkeydown="itemPickerKey(event,this,{kind:\'form\'})" oninput="itemPickerInput(this,{kind:\'form\'})"></div>'+
-  '<div><label>الوحدة</label><input id="niUnit" class="inp" value="'+(ei?esc(ei.unit||""):"")+'" placeholder="مثال: قطعة / متر / علبة"></div>'+
-  '<div><label>سعر البيع</label><input id="niSale" type="number" min="0" step="0.01" class="inp" value="'+(ei?esc(ei.salePrice):"")+'"></div>'+
-  '<div><label>سعر التكلفة</label><input id="niCost" type="number" min="0" step="0.01" class="inp" value="'+(ei?esc(ei.costPrice):"")+'"></div>'+
-  '<div><label>الكمية</label><input id="niQty" type="number" min="0" step="1" class="inp" value="'+(ei?esc(ei.qty):"0")+'"></div></div>'+
-  '<div class="row" style="margin-top:.6rem"><button type="button" class="btn btn-navy" onclick="doSaveItem()">'+(ei?"حفظ التعديل":"إضافة صنف")+'</button>'+
-  (ei?'<button type="button" class="btn btn-ghost" onclick="cancelEditItem()">إلغاء التعديل</button>':"")+'</div>'+
-  '<div class="row" style="margin-top:.6rem"><label class="btn btn-ghost" style="cursor:pointer">📥 استيراد من Excel (CSV)<input type="file" accept=".csv,text/csv" class="hidden" onchange="doImportItems(this)"></label>'+
-  '<button type="button" class="btn btn-gold btn-sm" onclick="doExportItems()">📤 تصدير الأصناف إلى Excel</button></div>'+
-  '<p class="muted">الاستيراد من ملف CSV بأعمدة: الكود، الاسم، الوحدة، سعر البيع، سعر التكلفة، الكمية — صف الترويسة اختياري. الصف بلا اسم يُرفض، والكود المكرر يُتخطى، ويظهر تقرير بالأعداد بعد الاستيراد.</p></div>';
-  h+='<div class="card"><h2>قائمة الأصناف</h2><div style="margin-bottom:.6rem"><label>بحث</label><input id="itSearch" class="inp" placeholder="ابحث بالاسم أو الكود…" value="'+esc(state.ui.itemFilter||"")+'" oninput="applyItemFilter(this.value)"></div><div id="itTableBox">'+itemTableHtml()+'</div></div>';
-  return h;
-}
-function doSaveItem(){
-  var ei=state.ui.editItemId?itemById(state.ui.editItemId):null;
-  var m=$("itMsg");
-  var r=ei?updateItem(ei.id,{code:$("niCode").value,name:$("niName").value,unit:$("niUnit").value,salePrice:$("niSale").value,costPrice:$("niCost").value,qty:$("niQty").value}):createItem($("niCode").value,$("niName").value,$("niUnit").value,$("niSale").value,$("niCost").value,$("niQty").value);
-  if(r.error){if(m)m.innerHTML='<div class="err">'+esc(r.error)+'</div>';return;}
-  state.ui.editItemId=null;render();
-  var m2=$("itMsg");if(m2)m2.innerHTML='<div class="okbox">تم حفظ الصنف «'+esc(r.item.name)+'» ('+esc(r.item.code)+').</div>';
-}
-function showEditItem(id){state.ui.editItemId=id;render();}
-function cancelEditItem(){state.ui.editItemId=null;render();}
-function delItem(id){
-  var it=itemById(id);if(!it)return;
-  if(typeof confirm==="function"&&!confirm("هل تريد حذف الصنف «"+it.name+"» ("+it.code+")؟"))return;
-  var r=deleteItem(id);
-  if(r.error){var m=$("itMsg");if(m)m.innerHTML='<div class="err">'+esc(r.error)+'</div>';else alert(r.error);return;}
-  render();
-}
-function doImportItems(input){
-  var f=input&&input.files&&input.files[0];if(!f)return;
-  if(typeof FileReader==="undefined"){alert("متصفحك لا يدعم قراءة الملفات.");return;}
-  var rd=new FileReader();
-  rd.onload=function(){
-    var r=importItemsCSV(String(rd.result||""));
-    render();
-    var m=$("itMsg");if(m)m.innerHTML='<div class="okbox">تم الاستيراد: مستورد '+r.imported+' — مكرر '+r.duplicated+' — مرفوض '+r.rejected+'.</div>';
-  };
-  rd.readAsText(f);
-}
-function doExportItems(){exportItemsCSV();}
 /* ---------- التعميد (المدير العام) ---------- */
 function screenApprovals(){
   var queue=state.quotations.filter(function(q){return q.status==="client_accepted";});
@@ -1992,6 +1815,139 @@ function doContract(qid){
   if(r.error){alert(r.error);return;}
   render();var m=$("ctMsg");if(m)m.innerHTML='<div class="okbox">تم تجهيز العقد '+esc(r.contract.number)+'.</div>';
 }
+
+function applyItemFilter(v){state.ui.itemFilter=v;renderItemTable();}
+function bindItemPickRows(container,target){
+  if(!container)return;
+  container.querySelectorAll(".item-pick-row").forEach(function(row){
+    row.addEventListener("click",function(){var it=itemById(row.getAttribute("data-item-id"));pickItem(it,target);});
+  });
+}
+function cancelEditItem(){state.ui.editItemId=null;render();}
+function closeItemPicker(){var m=$("itemPickerModal");if(m)m.remove();}
+function closeItemSuggest(){var d=$("itemPickerDrop");if(d)d.remove();}
+function delItem(id){
+  var it=itemById(id);if(!it)return;
+  if(typeof confirm==="function"&&!confirm("هل تريد حذف الصنف «"+it.name+"» ("+it.code+")؟"))return;
+  var r=deleteItem(id);
+  if(r.error){var m=$("itMsg");if(m)m.innerHTML='<div class="err">'+esc(r.error)+'</div>';else alert(r.error);return;}
+  render();
+}
+function doExportItems(){exportItemsCSV();}
+function doImportItems(input){
+  var f=input&&input.files&&input.files[0];if(!f)return;
+  if(typeof FileReader==="undefined"){alert("متصفحك لا يدعم قراءة الملفات.");return;}
+  var rd=new FileReader();
+  rd.onload=function(){
+    var r=importItemsCSV(String(rd.result||""));
+    render();
+    var m=$("itMsg");if(m)m.innerHTML='<div class="okbox">تم الاستيراد: مستورد '+r.imported+' — مكرر '+r.duplicated+' — مرفوض '+r.rejected+'.</div>';
+  };
+  rd.readAsText(f);
+}
+function doPrintQuote(qid){var r=printQuotation(qid);if(r.error){alert(r.error);return;}var q=quoteById(qid);logAudit("print_quotation","طباعة عرض السعر "+(q?q.number:""),q?q.number:"","عروض الأسعار");save();}
+function doSaveItem(){
+  var ei=state.ui.editItemId?itemById(state.ui.editItemId):null;
+  var m=$("itMsg");
+  var r=ei?updateItem(ei.id,{code:$("niCode").value,name:$("niName").value,unit:$("niUnit").value,salePrice:$("niSale").value,costPrice:$("niCost").value,qty:$("niQty").value}):createItem($("niCode").value,$("niName").value,$("niUnit").value,$("niSale").value,$("niCost").value,$("niQty").value);
+  if(r.error){if(m)m.innerHTML='<div class="err">'+esc(r.error)+'</div>';return;}
+  state.ui.editItemId=null;render();
+  var m2=$("itMsg");if(m2)m2.innerHTML='<div class="okbox">تم حفظ الصنف «'+esc(r.item.name)+'» ('+esc(r.item.code)+').</div>';
+}
+function doWaQuote(qid){var r=sendQuoteWhatsApp(qid);if(r&&r.error)alert(r.error);}
+function itemPickRowHtml(it){
+  return '<div class="item-pick-row" data-item-id="'+esc(it.id)+'"><b>'+esc(it.code)+'</b> — '+esc(it.name)+' <span class="muted">('+(esc(it.unit||"—"))+' — المتاح: '+it.qty+' — سعر البيع: '+fmtM(it.salePrice)+')</span></div>';
+}
+function itemPickerInput(inputEl,target){
+  closeItemSuggest();
+  var q=String(inputEl.value||"").trim();
+  if(q.length<1)return;
+  var matches=searchItems(q).slice(0,8);
+  if(!matches.length)return;
+  var d=document.createElement("div");
+  d.id="itemPickerDrop";d.className="item-suggest";
+  d.innerHTML=matches.map(function(it){return itemPickRowHtml(it);}).join("");
+  if(inputEl.parentElement)inputEl.parentElement.appendChild(d);else document.body.appendChild(d);
+  bindItemPickRows(d,target);
+}
+function itemPickerKey(e,inputEl,target){
+  if(e&&e.key==="F9"){e.preventDefault();openItemPicker(target);return;}
+  if(e&&e.key==="Escape"){closeItemPicker();closeItemSuggest();}
+}
+function itemPickerSearchInput(el){
+  var list=$("itemPickerList");if(!list)return;
+  var rows=searchItems(el.value).map(function(it){return itemPickRowHtml(it);}).join("");
+  list.innerHTML=rows||'<p class="muted">لا توجد أصناف مطابقة.</p>';
+  bindItemPickRows(list,state.ui.itemPickerTarget);
+}
+function itemTableHtml(){
+  var list=searchItems(state.ui.itemFilter||"");
+  var h="";
+  if(!list.length)h='<p class="muted">لا توجد أصناف مطابقة.</p>';
+  else{
+    h='<table><tr><th>الكود</th><th>الاسم</th><th>الوحدة</th><th>سعر البيع</th><th>سعر التكلفة</th><th>الكمية (رصيد المخزون)</th><th>إجراءات</th></tr>';
+    list.forEach(function(it){
+      h+='<tr><td class="num">'+esc(it.code)+'</td><td>'+esc(it.name)+'</td><td>'+esc(it.unit||"—")+'</td><td class="num">'+fmtM(it.salePrice)+'</td><td class="num">'+fmtM(it.costPrice)+'</td><td class="num">'+it.qty+'</td><td>'+
+      '<button type="button" class="btn btn-ghost btn-sm" onclick="showEditItem(\''+it.id+'\')">تعديل</button> '+
+      '<button type="button" class="btn btn-danger btn-sm" onclick="delItem(\''+it.id+'\')">حذف</button></td></tr>';
+    });
+    h+='</table>';
+  }
+  return h;
+}
+function openItemPicker(target){
+  closeItemPicker();closeItemSuggest();
+  var overlay=document.createElement("div");
+  overlay.id="itemPickerModal";
+  overlay.className="item-modal";
+  var rows=state.items.map(function(it){return itemPickRowHtml(it);}).join("");
+  overlay.innerHTML='<div class="item-modal-card"><h3>اختر صنفاً</h3>'+
+    '<input id="itemPickerSearch" class="inp" placeholder="ابحث بالاسم أو الكود…" oninput="itemPickerSearchInput(this)">'+
+    '<div id="itemPickerList" style="max-height:300px;overflow:auto;margin-top:.5rem">'+(rows||'<p class="muted">لا توجد أصناف مسجلة بعد — سجّلها من شاشة الأصناف.</p>')+'</div>'+
+    '<div class="row" style="margin-top:.6rem"><button type="button" class="btn btn-ghost" onclick="closeItemPicker()">إغلاق (Esc)</button></div></div>';
+  document.body.appendChild(overlay);
+  state.ui.itemPickerTarget=target;
+  bindItemPickRows(overlay,target);
+  var s=$("itemPickerSearch");if(s)try{s.focus();}catch(e){}
+}
+function pickItem(it,target){
+  if(!it)return;
+  closeItemPicker();closeItemSuggest();
+  if(target&&target.kind==="quote"){
+    var ls=qLines();var l=ls[target.line];if(!l)return;
+    l.name=it.name;l.price=it.salePrice;l.unit=it.unit||"";l.itemId=it.id;l.availQty=it.qty;
+    render();
+  }else if(target&&target.kind==="form"){
+    /* اختيار صنف في نموذج الأصناف يفتح وضع تعديله ببياناته كاملة. */
+    state.ui.editItemId=it.id;
+    render();
+  }else if(target&&target.el){
+    target.el.value=it.name;
+  }
+}
+function qMaintField(f,v){var qm=qMaintState();if(f==="amount")qm.amount=Number(v)||0;else qm[f]=v;}
+function qMaintState(){if(!state.ui.qMaint)state.ui.qMaint={included:false,type:CONTRACT_TYPES[0],amount:0,duration:""};return state.ui.qMaint;}
+function qMaintToggle(on){var qm=qMaintState();qm.included=!!on;render();}
+function renderItemTable(){var b=$("itTableBox");if(b)b.innerHTML=itemTableHtml();}
+function screenItems(){
+  var ei=state.ui.editItemId?itemById(state.ui.editItemId):null;
+  var h='<div class="card"><h2>الأصناف</h2><p class="muted">سجّل أصناف المواد مع الوحدة وأسعار البيع والتكلفة والكمية — تُستخدم في بنود عروض الأسعار (F9 أو الكتابة لاختيار صنف فيملأ السعر والوحدة). الكمية هي رصيد المخزون: تُخصم عند صرف المواد وتُعاد عند المرتجع. الحذف مسموح فقط للصنف الذي لم تُسجَّل عليه أي حركة إطلاقاً؛ إن كانت عليه حركات يُمنع حذفه برسالة واضحة ويبقى التعديل مسموحاً.</p><div id="itMsg"></div>';
+  h+='<h3>'+(ei?"تعديل الصنف «"+esc(ei.name)+"»":"إضافة صنف جديد")+'</h3><div class="form-grid">'+
+  '<div><label>الكود (تلقائي، قابل للتعديل، لا يتكرر)</label><input id="niCode" class="inp num" value="'+(ei?esc(ei.code):esc(peekSerial("item","ITM")))+'" onkeydown="itemPickerKey(event,this,{kind:\'form\'})" oninput="itemPickerInput(this,{kind:\'form\'})"></div>'+
+  '<div><label>اسم الصنف *</label><input id="niName" class="inp" value="'+(ei?esc(ei.name):"")+'" placeholder="اكتب جزءاً من الاسم أو اضغط F9" onkeydown="itemPickerKey(event,this,{kind:\'form\'})" oninput="itemPickerInput(this,{kind:\'form\'})"></div>'+
+  '<div><label>الوحدة</label><input id="niUnit" class="inp" value="'+(ei?esc(ei.unit||""):"")+'" placeholder="مثال: قطعة / متر / علبة"></div>'+
+  '<div><label>سعر البيع</label><input id="niSale" type="number" min="0" step="0.01" class="inp" value="'+(ei?esc(ei.salePrice):"")+'"></div>'+
+  '<div><label>سعر التكلفة</label><input id="niCost" type="number" min="0" step="0.01" class="inp" value="'+(ei?esc(ei.costPrice):"")+'"></div>'+
+  '<div><label>الكمية</label><input id="niQty" type="number" min="0" step="1" class="inp" value="'+(ei?esc(ei.qty):"0")+'"></div></div>'+
+  '<div class="row" style="margin-top:.6rem"><button type="button" class="btn btn-navy" onclick="doSaveItem()">'+(ei?"حفظ التعديل":"إضافة صنف")+'</button>'+
+  (ei?'<button type="button" class="btn btn-ghost" onclick="cancelEditItem()">إلغاء التعديل</button>':"")+'</div>'+
+  '<div class="row" style="margin-top:.6rem"><label class="btn btn-ghost" style="cursor:pointer">📥 استيراد من Excel (CSV)<input type="file" accept=".csv,text/csv" class="hidden" onchange="doImportItems(this)"></label>'+
+  '<button type="button" class="btn btn-gold btn-sm" onclick="doExportItems()">📤 تصدير الأصناف إلى Excel</button></div>'+
+  '<p class="muted">الاستيراد من ملف CSV بأعمدة: الكود، الاسم، الوحدة، سعر البيع، سعر التكلفة، الكمية — صف الترويسة اختياري. الصف بلا اسم يُرفض، والكود المكرر يُتخطى، ويظهر تقرير بالأعداد بعد الاستيراد.</p></div>';
+  h+='<div class="card"><h2>قائمة الأصناف</h2><div style="margin-bottom:.6rem"><label>بحث</label><input id="itSearch" class="inp" placeholder="ابحث بالاسم أو الكود…" value="'+esc(state.ui.itemFilter||"")+'" oninput="applyItemFilter(this.value)"></div><div id="itTableBox">'+itemTableHtml()+'</div></div>';
+  return h;
+}
+function showEditItem(id){state.ui.editItemId=id;render();}
 </script>
 <script>
 /* ---------- الاعتماد المالي والمديونيات ---------- */
@@ -2076,54 +2032,42 @@ function editOpening(cid){
   if(r.error){alert(r.error);return;}
   render();
 }
-/* ---------- المستخدمون (مدير النظام فقط) ---------- */
-function togglePwById(id){var p=$(id);if(!p)return;p.type=(p.type==="password")?"text":"password";}
-/* صلاحيات نموذج المستخدمين: تُهيأ عند فتح النموذج (صلاحيات المستخدم
-   نفسه عند التعديل، أو افتراضي الدور عند الإضافة)، وتُملأ تلقائياً
-   حسب الدور عند تغييره من القائمة، وتبقى قابلة للتعديل يدوياً. */
-function initUserPerms(eu){
-  var formKey=eu?eu.id:"new";
-  if(state.ui.permUserId===formKey)return;
-  state.ui.permUserId=formKey;
-  state.ui.permRole=eu?eu.role:"gm";
-  state.ui.permInit=eu?(Array.isArray(eu.permissions)?eu.permissions.slice():(ROLE_SCREENS[eu.role]||[]).slice()):(ROLE_SCREENS["gm"]||[]).slice();
-}
-function applyRolePerms(role){
-  state.ui.permRole=role;
-  state.ui.permInit=(ROLE_SCREENS[role]||[]).slice();
-  document.querySelectorAll(".nuPerm").forEach(function(c){c.checked=state.ui.permInit.indexOf(c.value)>=0;});
-}
-function readPermCheckboxes(){var out=[];document.querySelectorAll(".nuPerm:checked").forEach(function(c){out.push(c.value);});return out;}
+/* ---------- المستخدمون (المدير العام فقط) ---------- */
 function screenUsers(){
   var eu=state.ui.editUserId?userById(state.ui.editUserId):null;
   initUserPerms(eu);
   var permInit=state.ui.permInit||[];
-  var h='<div class="card"><h2>المستخدمون</h2><p class="muted">إنشاء المستخدمين فقط من داخل النظام وبواسطة مدير النظام — لا يوجد تسجيل من شاشة الدخول. مدير النظام (1/1) يملك كل الصلاحيات دائماً ولا يُغيَّر دوره، والمدير العام تُمنح صلاحياته من هنا (افتراضياً: اعتماد العروض والتقارير فقط).</p><div id="usrMsg"></div>'+
+  var h='<div class="card"><h2>المستخدمون</h2><p class="muted">إنشاء المستخدمين فقط من داخل النظام — بواسطة مدير النظام أو الحسابات — ولا يوجد تسجيل من شاشة الدخول. مدير النظام (1/1) يملك كل الصلاحيات دائماً ولا يُغيَّر دوره، والمدير العام تُمنح صلاحياته من هنا (افتراضياً: اعتماد العروض والتقارير فقط). الحذف وتعيين دور «مدير النظام» ومنح «التقارير الرقابية» لمدير النظام فقط.</p><div id="usrMsg"></div>'+
   '<h3>'+(eu?"تعديل المستخدم «"+esc(eu.username)+"»":"إضافة مستخدم جديد")+'</h3><div class="form-grid">'+
   '<div><label>اسم المستخدم *</label><input id="nuUser" class="inp" value="'+(eu?esc(eu.username):"")+'"'+(eu&&eu.username==="1"?" disabled":"")+'>'+(eu&&eu.username==="1"?'<p class="muted">اسم مدير النظام «1» لا يُغيَّر.</p>':"")+'</div>'+
   '<div><label>كلمة المرور *</label><div class="pw-wrap"><input id="nuPass" type="password" class="inp" value="'+(eu?esc(eu.password||""):"")+'"><button type="button" class="eye" onclick="togglePwById(\'nuPass\')" title="إظهار / إخفاء كلمة المرور">👁</button></div></div>'+
   '<div><label>الاسم الكامل</label><input id="nuName" class="inp" value="'+(eu?esc(eu.fullName||""):"")+'"></div>'+
   '<div><label>رقم الجوال (لإشعار واتساب عند الإسناد)</label><input id="nuPhone" class="inp" dir="ltr" value="'+(eu?esc(eu.phone||""):"")+'" placeholder="05xxxxxxxx"></div>'+
-  '<div><label>الدور *</label><select id="nuRole" class="inp" onchange="applyRolePerms(this.value)"'+(eu&&eu.username==="1"?" disabled":"")+'>'+Object.keys(ROLES).map(function(k){return '<option value="'+k+'"'+((eu?eu.role===k:k==="gm")?" selected":"")+'>'+esc(ROLES[k].name)+'</option>';}).join("")+'</select>'+(eu&&eu.username==="1"?'<p class="muted">دور مدير النظام «1» لا يُغيَّر.</p>':"")+'</div>'+
+  '<div><label>الدور *</label><select id="nuRole" class="inp" onchange="applyRolePerms(this.value)"'+(eu&&eu.username==="1"?" disabled":"")+'>'+Object.keys(ROLES).filter(function(k){return isAdminUser()||k!=="admin";}).map(function(k){return '<option value="'+k+'"'+((eu?eu.role===k:k==="gm")?" selected":"")+'>'+esc(ROLES[k].name)+'</option>';}).join("")+'</select>'+(eu&&eu.username==="1"?'<p class="muted">دور مدير النظام «1» لا يُغيَّر.</p>':(!isAdminUser()?'<p class="muted">دور «مدير النظام» لا يظهر إلا لمدير النظام.</p>':""))+'</div>'+
   '<h3 style="grid-column:1/-1">صلاحيات المستخدم</h3><p class="muted" style="grid-column:1/-1">تُملأ تلقائياً حسب الدور عند تغييره، وتبقى قابلة للتعديل من مدير النظام. شاشة «التقارير الرقابية» لا تُمنح إلا صراحةً من هنا — والمدير العام لا يملكها افتراضياً. أي تعديل على المستخدم (رمز/دور/صلاحيات) يسري فوراً: يُبطل جلسته الحالية ويعيد الدخول بالبيانات الجديدة.</p>'+
-  PERM_SCREENS.map(function(s){return '<label style="display:block;font-weight:400"><input type="checkbox" class="nuPerm" value="'+s+'"'+(permInit.indexOf(s)>=0?" checked":"")+'> '+esc(SCREEN_TITLES[s])+'</label>';}).join("")+
+  (eu&&eu.username==="1"?'<p class="muted" style="grid-column:1/-1"><b>مدير النظام يملك جميع الصلاحيات دائماً ولا يمكن تقليلها — خانات الصلاحيات معطّلة.</b></p>':"")+
+  (!isAdminUser()?'<p class="muted" style="grid-column:1/-1">الحذف وتعيين دور «مدير النظام» ومنح «التقارير الرقابية» لمدير النظام فقط — خانتها معطّلة هنا.</p>':"")+
+  PERM_SCREENS.map(function(s){return '<label style="display:block;font-weight:400"><input type="checkbox" class="nuPerm" value="'+s+'"'+(permInit.indexOf(s)>=0?" checked":"")+(eu&&eu.username==="1"?" disabled":"")+((s==="audit"&&!isAdminUser())?" disabled":"")+'> '+esc(SCREEN_TITLES[s])+((s==="audit"&&!isAdminUser())?" (لمدير النظام فقط)":"")+'</label>';}).join("")+
   '</div>'+
   '<div class="row" style="margin-top:.6rem"><button type="button" class="btn btn-navy" onclick="doCreateUser()">'+(eu?"حفظ التعديل":"إضافة مستخدم")+'</button>'+
   (eu?'<button type="button" class="btn btn-ghost" onclick="cancelEditUser()">إلغاء التعديل</button>':"")+'</div></div>';
   h+='<div class="card"><h2>قائمة المستخدمين</h2><table><tr><th>اسم المستخدم</th><th>الاسم</th><th>الدور</th><th>الحالة</th><th>إجراءات</th></tr>';
   state.users.forEach(function(u){
+    /* غير مدير النظام: لا زر حذف إطلاقاً (الحذف لمدير النظام فقط)،
+       ولا أزرار تعديل/إيقاف/إعادة رمز لحساب «1» ولا لحساب بدور
+       «مدير النظام» — تظهر بدلها عبارة «محمي». */
+    var canEditRow=isAdminUser()||(u.username!=="1"&&u.role!=="admin");
     h+='<tr><td class="num">'+esc(u.username)+'</td><td>'+esc(u.fullName||"")+'</td><td>'+esc(roleName(u.role))+'</td><td>'+(u.active===false?'<span class="badge b-rejected">موقوف</span>':'<span class="badge b-approved">نشط</span>')+'</td><td>'+
-    '<button type="button" class="btn btn-ghost btn-sm" onclick="showEditUser(\''+u.id+'\')">تعديل</button> '+
-    (u.username!=="1"?'<button type="button" class="btn btn-ghost btn-sm" onclick="toggleUser(\''+u.id+'\')">'+(u.active===false?"تفعيل":"إيقاف")+'</button> ':"")+
-    '<button type="button" class="btn btn-ghost btn-sm" onclick="resetUserPw(\''+u.id+'\')">إعادة تعيين كلمة المرور</button> '+
-    (u.username!=="1"?'<button type="button" class="btn btn-danger btn-sm" onclick="delUser(\''+u.id+'\')">حذف</button>':"")+
+    (canEditRow?'<button type="button" class="btn btn-ghost btn-sm" onclick="showEditUser(\''+u.id+'\')">تعديل</button> ':"")+
+    (canEditRow&&u.username!=="1"?'<button type="button" class="btn btn-ghost btn-sm" onclick="toggleUser(\''+u.id+'\')">'+(u.active===false?"تفعيل":"إيقاف")+'</button> ':"")+
+    (canEditRow?'<button type="button" class="btn btn-ghost btn-sm" onclick="resetUserPw(\''+u.id+'\')">إعادة تعيين كلمة المرور</button> ':"")+
+    (isAdminUser()&&u.username!=="1"?'<button type="button" class="btn btn-danger btn-sm" onclick="delUser(\''+u.id+'\')">حذف</button>':"")+
+    (!canEditRow?'<span class="muted">محمي — لمدير النظام فقط</span>':"")+
     '</td></tr>';
   });
   h+='</table></div>';
   return h;
 }
-function showEditUser(uid2){var u=userById(uid2);if(!u)return;state.ui.editUserId=uid2;render();}
-function cancelEditUser(){state.ui.editUserId=null;render();}
 function doCreateUser(){
   var eu=state.ui.editUserId?userById(state.ui.editUserId):null;
   var m=$("usrMsg");
@@ -2135,6 +2079,9 @@ function doCreateUser(){
   var phone=$("nuPhone")?$("nuPhone").value:"";
   if(eu){
     var fields={fullName:$("nuName").value,role:role,password:$("nuPass").value,phone:phone,permissions:perms};
+    /* دفاع إضافي في الواجهة: صلاحيات «1» كاملة دائماً مهما كانت
+       حالة الخانات (حارس updateUser يفرضها أيضاً في المنطق). */
+    if(eu.username==="1")fields.permissions=FULL_PERMS.slice();
     if(eu.username!=="1")fields.username=$("nuUser").value;
     var r2=updateUser(eu.id,fields);
     if(r2.error){if(m)m.innerHTML='<div class="err">'+esc(r2.error)+'</div>';return;}
@@ -2183,139 +2130,6 @@ function doAddLeave(){
   var emp=$("lvEmp").value;if(!emp){alert("اختر الموظف.");return;}
   state.leaves.push({id:uid("lv"),employeeId:emp,from:$("lvFrom").value,to:$("lvTo").value,type:$("lvType").value,createdAt:nowISO()});
   save();render();
-}
-/* ---------- مرتجع المواد ---------- */
-function screenReturns(){
-  var qs=state.quotations.filter(function(q){return q.status==="financial_approved";});
-  var h='<div class="card"><h2>مرتجع المواد</h2><p class="muted">إرجاع مواد منصرفة من عرض معتمد مالياً — تُخفَّض قيمة المرتجع من مديونية العميل فوراً، وتظهر المواد المرتجعة في عرض السعر المرتبط وفي كشف حساب العميل.</p><div id="retMsg"></div>';
-  h+='<div class="form-grid"><div><label>العرض المعتمد مالياً *</label><select id="rtQuote" class="inp" onchange="renderReturnItems()"><option value="">— اختر العرض —</option>'+qs.map(function(q){return '<option value="'+esc(q.id)+'">'+esc(q.number)+' — '+esc((clientById(q.clientId)||{}).name||"")+' — '+fmtM(q.total)+'</option>';}).join("")+'</select></div>'+
-  '<div><label>المادة *</label><select id="rtItem" class="inp"><option value="">— اختر العرض أولاً —</option></select></div>'+
-  '<div><label>الكمية المرتجعة *</label><input id="rtQty" type="number" min="1" step="1" class="inp" value="1"></div>'+
-  '<div><label>ملاحظة</label><input id="rtNote" class="inp" placeholder="اختياري"></div></div>'+
-  '<div class="row" style="margin-top:.6rem"><button type="button" class="btn btn-navy" onclick="doReturn()">تسجيل المرتجع وتخفيض المديونية</button></div></div>';
-  h+='<div class="card"><h2>المرتجعات المسجلة</h2>';
-  if(!state.material_returns.length)h+='<p class="muted">لا توجد مرتجعات بعد.</p>';
-  else{h+='<table><tr><th>رقم المستند</th><th>العرض</th><th>العميل</th><th>المادة</th><th>الكمية</th><th>سعر الوحدة</th><th>القيمة</th><th>التاريخ</th></tr>';
-  state.material_returns.slice().reverse().forEach(function(r){var q=quoteById(r.quotationId);h+='<tr><td class="num">'+esc(r.docNo)+'</td><td class="num">'+(q?esc(q.number):"—")+'</td><td>'+esc((clientById(r.clientId)||{}).name||"")+'</td><td>'+esc(r.itemName)+'</td><td class="num">'+r.qty+'</td><td class="num">'+fmtM(r.unitPrice)+'</td><td class="num">'+fmtM(r.amount)+'</td><td class="num">'+esc(r.date)+'</td></tr>';});
-  h+='</table>';}
-  return h+'</div>';
-}
-function renderReturnItems(){
-  var qid=$("rtQuote")?$("rtQuote").value:"";
-  var sel=$("rtItem");if(!sel)return;
-  var q=quoteById(qid);
-  if(!q){sel.innerHTML='<option value="">— اختر العرض أولاً —</option>';return;}
-  var opts='<option value="">— اختر المادة —</option>';
-  q.items.forEach(function(it){
-    var issued=0;state.material_issues.forEach(function(m){if(String(m.quotationId)===String(q.id)&&String(m.itemName)===String(it.name))issued+=Number(m.qtyIssued)||0;});
-    var max=issued-returnedQtyForItem(q.id,it.name);
-    opts+='<option value="'+esc(it.name)+'"'+(max<=0?" disabled":"")+'>'+esc(it.name)+' — قابل للإرجاع: '+max+' (منصرف '+issued+')</option>';
-  });
-  sel.innerHTML=opts;
-}
-function doReturn(){
-  var r=createMaterialReturn($("rtQuote").value,$("rtItem").value,$("rtQty").value,$("rtNote").value);
-  var m=$("retMsg");
-  if(r.error){if(m)m.innerHTML='<div class="err">'+esc(r.error)+'</div>';else alert(r.error);return;}
-  render();var m2=$("retMsg");if(m2)m2.innerHTML='<div class="okbox">تم تسجيل المرتجع '+esc(r.ret.docNo)+' بقيمة '+fmtM(r.ret.amount)+' — خُفّضت مديونية العميل بهذه القيمة.</div>';
-}
-/* ---------- إدارة الحسابات (تصميم لوحة مالية داكنة) ---------- */
-/* الأرقام كلها من بيانات النظام الحقيقية فقط:
-   الإيرادات = الدفعات المسجلة من العملاء + الإيرادات المسجلة يدوياً.
-   المصروفات = تكلفة المواد المنصرفة للعروض المعتمدة مالياً + المصروفات المسجلة يدوياً.
-   رصيد البنك = الافتتاحي (من التهيئة) + حركات البنك المسجلة.
-   رصيد الخزنة = الافتتاحي (من التهيئة) + الدفعات والإيرادات النقدية − المصروفات النقدية − تكلفة المواد. */
-function screenAccounts(){
-  var rev=revenueTotal(),exp=expenseTotal(),net=Math.round((rev-exp)*100)/100;
-  var bank=bankBalanceCalc(),safe=safeBalanceCalc();
-  var period=state.ui.accPeriod||"all";
-  var months=accMonthly();
-  if(period==="month")months=months.slice(-1);
-  else if(period==="3m")months=months.slice(-3);
-  var bd=expenseBreakdown();
-  var DONUT_COLORS=["#2f80ed","#f2994a","#27ae60","#9b51e0","#eb5757","#f2c94c","#56ccf2","#bb6bd9"];
-  var donutStyle="background:#22345c";
-  if(bd.total>0){
-    var stops=[],acc=0;
-    bd.rows.forEach(function(r,i){var pct=r.amount/bd.total*100;stops.push(DONUT_COLORS[i%DONUT_COLORS.length]+" "+acc.toFixed(1)+"% "+(acc+pct).toFixed(1)+"%");acc+=pct;});
-    donutStyle="background:conic-gradient("+stops.join(",")+")";
-  }
-  var maxV=0;months.forEach(function(m){if(m.rev>maxV)maxV=m.rev;if(m.exp>maxV)maxV=m.exp;});
-  var h='<div class="acc"><div class="acc-head"><div><h2>إدارة الحسابات</h2><p style="color:#bcd;margin:.2rem 0">نظام مالي متكامل — الأرقام من بيانات النظام الحقيقية</p></div>'+
-  '<div class="row"><button type="button" class="btn btn-ghost btn-sm'+(period==="all"?" on":"")+'" onclick="setAccPeriod(\'all\')" style="background:rgba(255,255,255,.12);color:#fff">كل الفترات</button>'+
-  '<button type="button" class="btn btn-ghost btn-sm'+(period==="3m"?" on":"")+'" onclick="setAccPeriod(\'3m\')" style="background:rgba(255,255,255,.12);color:#fff">آخر 3 أشهر</button>'+
-  '<button type="button" class="btn btn-ghost btn-sm'+(period==="month"?" on":"")+'" onclick="setAccPeriod(\'month\')" style="background:rgba(255,255,255,.12);color:#fff">الشهر الحالي</button></div></div>';
-  h+='<div class="acc-grid"><div>'+
-  '<div class="sumcards">'+
-  '<div class="sumcard c-bank"><div class="t">🏦 رصيد البنك</div><div class="n">'+fmtM(bank)+'</div></div>'+
-  '<div class="sumcard c-safe"><div class="t">🗄️ رصيد الخزنة</div><div class="n">'+fmtM(safe)+'</div></div>'+
-  '<div class="sumcard c-exp"><div class="t">🪙 إجمالي المصروفات</div><div class="n">'+fmtM(exp)+'</div></div>'+
-  '<div class="sumcard c-rev"><div class="t">💵 إجمالي الإيرادات</div><div class="n">'+fmtM(rev)+'</div></div></div>';
-  h+='<div class="grid c2"><div class="panel"><h3>📊 الأداء المالي خلال الفترة</h3>';
-  if(!months.length)h+='<p style="color:#bcd">لا توجد حركات مالية بعد — سجّل دفعة أو إيراداً أو مصروفاً لتظهر هنا.</p>';
-  else{
-    h+='<div class="bars">'+months.map(function(m){
-      var rh=maxV>0?Math.max(4,Math.round(m.rev/maxV*110)):4;
-      var eh=maxV>0?Math.max(4,Math.round(m.exp/maxV*110)):4;
-      return '<div class="bar-group"><div class="bar-pair"><div class="bar bar-rev" style="height:'+rh+'px" title="إيرادات '+fmtM(m.rev)+'"></div><div class="bar bar-exp" style="height:'+eh+'px" title="مصروفات '+fmtM(m.exp)+'"></div></div><div>'+esc(m.label)+'</div><div style="font-size:.8rem;color:#ffd76a">صافي '+fmtM(m.net)+'</div></div>';
-    }).join("")+'</div><p style="color:#bcd;font-size:.85rem;margin:.4rem 0 0"><span style="color:#2f9e44">■</span> الإيرادات &nbsp; <span style="color:#e03131">■</span> المصروفات</p>';
-  }
-  h+='</div><div class="panel"><h3>📈 توزيع المصروفات حسب التصنيف</h3>';
-  if(bd.total<=0)h+='<p style="color:#bcd">لا توجد مصروفات بعد.</p>';
-  else{
-    h+='<div class="donut-wrap"><div class="donut" style="'+donutStyle+'"></div><div class="legend">'+
-    bd.rows.map(function(r,i){return '<div><span class="dot" style="background:'+DONUT_COLORS[i%DONUT_COLORS.length]+'"></span>'+esc(r.name)+' — <b>'+r.pct+'%</b> ('+fmtM(r.amount)+')</div>';}).join("")+
-    '</div></div><p style="text-align:center;margin:.4rem 0 0"><b>'+fmtM(bd.total)+'</b><br><span style="color:#bcd">إجمالي</span></p>';
-  }
-  h+='</div></div>';
-  h+='<div class="panel"><h3>🧮 ملخص الحسابات</h3><div class="grid c4" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">'+
-  '<div><div style="color:#bcd">إجمالي الإيرادات</div><div style="font-size:1.4rem;font-weight:800;color:#2f9e44">'+fmtM(rev)+'</div></div>'+
-  '<div><div style="color:#bcd">إجمالي المصروفات</div><div style="font-size:1.4rem;font-weight:800;color:#e03131">'+fmtM(exp)+'</div></div>'+
-  '<div><div style="color:#bcd">صافي الربح</div><div style="font-size:1.4rem;font-weight:800;color:#ffd76a">'+fmtM(net)+'</div></div>'+
-  '<div><div style="color:#bcd">تكلفة المواد المنصرفة</div><div style="font-size:1.4rem;font-weight:800">'+fmtM(materialCostTotal())+'</div></div></div></div>';
-  var moves=accountMovements();
-  h+='<div class="panel"><h3>🕒 أحدث الحركات المالية</h3>';
-  if(!moves.length)h+='<p style="color:#bcd">لا توجد حركات مالية بعد.</p>';
-  else{
-    h+='<table><tr><th>التاريخ</th><th>البيان</th><th>التصنيف</th><th>طريقة الدفع</th><th>النوع</th><th>المبلغ</th></tr>';
-    moves.slice(0,10).forEach(function(mv){
-      h+='<tr><td class="num">'+esc(mv.date)+'</td><td>'+esc(mv.desc)+'</td><td>'+esc(mv.category)+'</td><td>'+esc(mv.method)+'</td><td>'+(mv.kind==="revenue"?'<span class="badge b-approved">إيراد</span>':mv.kind==="return"?'<span class="badge b-inspected">مرتجع</span>':'<span class="badge b-rejected">مصروف</span>')+'</td><td class="num">'+fmtM(mv.amount)+'</td></tr>';
-    });
-    h+='</table>';
-  }
-  h+='</div></div>';
-  h+='<div class="acc-side">'+
-  '<button type="button" class="btn btn-gold" onclick="goScreen(\'dashboard\')">🏠 الرئيسية</button>'+
-  '<button type="button" class="btn btn-green" onclick="showAccForm(\'revenue\')">➕ تسجيل إيراد</button>'+
-  '<button type="button" class="btn btn-danger" onclick="showAccForm(\'expense\')">➖ تسجيل مصروف</button>'+
-  '<button type="button" class="btn btn-ghost" onclick="showAccMoves()" style="background:rgba(255,255,255,.12);color:#fff">📋 سجل الحركات</button>'+
-  '<button type="button" class="btn btn-ghost" onclick="goScreen(\'reports\')" style="background:rgba(255,255,255,.12);color:#fff">📊 التقارير</button>'+
-  '<button type="button" class="btn btn-ghost" onclick="goScreen(\'settings\')" style="background:rgba(255,255,255,.12);color:#fff">⚙ الإعدادات</button>';
-  if(state.ui.accForm){
-    var isRev=state.ui.accForm==="revenue";
-    h+='<div class="panel"><h3>'+(isRev?"تسجيل إيراد":"تسجيل مصروف")+'</h3><div id="accMsg"></div>'+
-    '<div><label style="color:#fff">المبلغ *</label><input id="acAmt" type="number" min="0" step="0.01" class="inp"></div>'+
-    '<div><label style="color:#fff">التصنيف</label><input id="acCat" class="inp" placeholder="'+(isRev?"مثال: إيراد خدمات":"مثال: رواتب / وقود / إيجار")+'"></div>'+
-    '<div><label style="color:#fff">طريقة الدفع</label><select id="acMethod" class="inp"><option>نقدي</option><option>بنك</option></select></div>'+
-    (isRev?'<div><label style="color:#fff">العميل (اختياري — إن اخترته تُخصم من مديونيته)</label><select id="acClient" class="inp"><option value="">— بدون عميل —</option>'+state.clients.map(function(c){return '<option value="'+esc(c.id)+'">'+esc(c.name)+'</option>';}).join("")+'</select></div>':"")+
-    '<div><label style="color:#fff">البيان</label><input id="acDesc" class="inp" placeholder="وصف الحركة"></div>'+
-    '<div class="row" style="margin-top:.6rem"><button type="button" class="btn btn-gold" onclick="doAccTransaction()">حفظ الحركة</button>'+
-    '<button type="button" class="btn btn-ghost" onclick="hideAccForm()" style="background:rgba(255,255,255,.12);color:#fff">إلغاء</button></div></div>';
-  }
-  h+='</div></div></div>';
-  return h;
-}
-function setAccPeriod(p){state.ui.accPeriod=p;render();}
-function showAccForm(kind){state.ui.accForm=kind;render();}
-function hideAccForm(){state.ui.accForm=null;render();}
-function showAccMoves(){var els=document.querySelectorAll(".acc .panel");var last=els[els.length-1];if(last&&last.scrollIntoView)try{last.scrollIntoView();}catch(e){}}
-function doAccTransaction(){
-  var kind=state.ui.accForm||"expense";
-  var clientId=kind==="revenue"&&$("acClient")?$("acClient").value:null;
-  var r=recordTransaction(kind,$("acAmt").value,$("acCat").value,$("acMethod").value,$("acDesc").value,clientId);
-  if(r.error){alert(r.error);return;}
-  state.ui.accForm=null;render();
-  var m=$("accMsg");if(m)m.innerHTML='<div class="okbox">تم تسجيل '+(kind==="revenue"?"الإيراد":"المصروف")+' '+esc(r.transaction.docNo)+' بمبلغ '+fmtM(r.transaction.amount)+'.</div>';
 }
 /* ---------- الإشعارات والإعدادات ---------- */
 function screenNotifications(){
@@ -2379,33 +2193,10 @@ function screenSettings(){
   h+='</div>';
   return h;
 }
-function askSetup(){state.ui.setupAsk=true;state.ui.setupOpen=false;render();}
-function closeSetup(){state.ui.setupAsk=false;state.ui.setupOpen=false;render();}
-function doCheckSetup(){
-  var code=$("setupCodeIn")?$("setupCodeIn").value:"";
-  if(checkSetupCode(code)){state.ui.setupOpen=true;render();return;}
-  var e=$("setupErr");if(e)e.innerHTML='<div class="err">رمز التهيئة غير صحيح — أعد المحاولة.</div>';
-}
-function doSaveSetup(){
-  var nc=($("suCode")?$("suCode").value:"").trim();
-  var nc2=($("suCode2")?$("suCode2").value:"").trim();
-  var m=$("setupMsg");
-  if(nc&&nc!==nc2){if(m)m.innerHTML='<div class="err">رمز التهيئة الجديد وتأكيده غير متطابقين.</div>';return;}
-  var r=saveSetupSettings({companyName:$("suName").value,companyNameEn:$("suNameEn").value,commercialReg:$("suReg").value,taxNumber:$("suTax").value,ownerName:$("suOwner").value,ownerPhone:$("suOwnerPhone").value,city:$("suCity").value,district:$("suDistrict").value,street:$("suStreet").value,buildingNo:$("suBuilding").value,postalCode:$("suPostal").value,subNumber:$("suSub").value,address:$("suAddr").value,phones:$("suPhones").value,email:$("suEmail").value,currency:$("suCur").value,vatRate:$("suVat").value,bankBalance:$("suBank").value,safeBalance:$("suSafe").value,newCode:nc||undefined});
-  if(r.error){if(m)m.innerHTML='<div class="err">'+esc(r.error)+'</div>';return;}
-  render();var m2=$("setupMsg");if(m2)m2.innerHTML='<div class="okbox">تم حفظ التهيئة'+(nc?" — ورمز التهيئة الجديد يعمل من الآن.":".")+'</div>';
-}
 function doSaveSettings(){
   var s=state.settings[0];if(!s){state.settings=[{id:"main"}];s=state.settings[0];}
   s.companyName=$("stName").value;s.currency=$("stCur").value;s.vatRate=Number($("stVat").value)||15;
   logAudit("save_settings","حفظ الإعدادات (اسم الشركة والعملة ونسبة الضريبة)","","الإعدادات");save();render();var m=$("setMsg");if(m)m.innerHTML='<div class="okbox">تم حفظ الإعدادات.</div>';
-}
-function backupSnapshot(){
-  /* نسخة البيانات للتنزيل: سجل التدقيق لا يُشمل فيها أبداً — يبقى في
-     النظام ولا يُسترجع من نسخة قديمة. */
-  var snap=JSON.parse(JSON.stringify(state));
-  delete snap.audit_log;
-  return snap;
 }
 function downloadBackup(){
   try{
@@ -2447,7 +2238,7 @@ function boot(){
 /* واجهة الاختبار: دوال الحالة والمنطق متاحة عالمياً */
 window.MSHRY={
   state:function(){return state;},SYNC:SYNC,COMPANY_KEY:COMPANY_KEY,COMPANY_ID:COMPANY_ID,
-  COLLECTIONS:COLLECTIONS,ROLES:ROLES,
+  COLLECTIONS:COLLECTIONS,ROLES:ROLES,FULL_PERMS:FULL_PERMS,
   loadState:loadState,defState:defState,saveLocal:saveLocal,save:save,
   nextSerial:nextSerial,peekSerial:peekSerial,isSerialUsed:isSerialUsed,
   syncCheck:syncCheck,syncMergeRows:syncMergeRows,syncPullFromServer:syncPullFromServer,
@@ -2489,13 +2280,187 @@ window.MSHRY={
   normalizePhone:normalizePhone,buildTechnicianWhatsApp:buildTechnicianWhatsApp,
   sendTechnicianWhatsApp:sendTechnicianWhatsApp,doWaTechnician:doWaTechnician,
   qMaintState:qMaintState,qMaintToggle:qMaintToggle,qMaintField:qMaintField,
-  userScreens:userScreens,canSee:canSee,closeItemPicker:closeItemPicker,closeItemSuggest:closeItemSuggest,
+  userScreens:userScreens,canSee:canSee,isAdminUser:isAdminUser,closeItemPicker:closeItemPicker,closeItemSuggest:closeItemSuggest,
   openItemPicker:openItemPicker,pickItem:pickItem,applyRolePerms:applyRolePerms,
   validateSession:validateSession,forceLogout:forceLogout,ensureAdminUser:ensureAdminUser,
   auditDisplayUser:auditDisplayUser,ROLE_SCREENS:ROLE_SCREENS,PERM_SCREENS:PERM_SCREENS,
   SCREEN_TITLES:SCREEN_TITLES,isGM:isGM,isAccounts:isAccounts
 };
 boot();
+
+function applyRolePerms(role){
+  state.ui.permRole=role;
+  state.ui.permInit=(ROLE_SCREENS[role]||[]).slice();
+  document.querySelectorAll(".nuPerm").forEach(function(c){c.checked=state.ui.permInit.indexOf(c.value)>=0;});
+}
+function askSetup(){state.ui.setupAsk=true;state.ui.setupOpen=false;render();}
+function backupSnapshot(){
+  /* نسخة البيانات للتنزيل: سجل التدقيق لا يُشمل فيها أبداً — يبقى في
+     النظام ولا يُسترجع من نسخة قديمة. */
+  var snap=JSON.parse(JSON.stringify(state));
+  delete snap.audit_log;
+  return snap;
+}
+function cancelEditUser(){state.ui.editUserId=null;render();}
+function closeSetup(){state.ui.setupAsk=false;state.ui.setupOpen=false;render();}
+function doAccTransaction(){
+  var kind=state.ui.accForm||"expense";
+  var clientId=kind==="revenue"&&$("acClient")?$("acClient").value:null;
+  var r=recordTransaction(kind,$("acAmt").value,$("acCat").value,$("acMethod").value,$("acDesc").value,clientId);
+  if(r.error){alert(r.error);return;}
+  state.ui.accForm=null;render();
+  var m=$("accMsg");if(m)m.innerHTML='<div class="okbox">تم تسجيل '+(kind==="revenue"?"الإيراد":"المصروف")+' '+esc(r.transaction.docNo)+' بمبلغ '+fmtM(r.transaction.amount)+'.</div>';
+}
+function doCheckSetup(){
+  var code=$("setupCodeIn")?$("setupCodeIn").value:"";
+  if(checkSetupCode(code)){state.ui.setupOpen=true;render();return;}
+  var e=$("setupErr");if(e)e.innerHTML='<div class="err">رمز التهيئة غير صحيح — أعد المحاولة.</div>';
+}
+function doReturn(){
+  var r=createMaterialReturn($("rtQuote").value,$("rtItem").value,$("rtQty").value,$("rtNote").value);
+  var m=$("retMsg");
+  if(r.error){if(m)m.innerHTML='<div class="err">'+esc(r.error)+'</div>';else alert(r.error);return;}
+  render();var m2=$("retMsg");if(m2)m2.innerHTML='<div class="okbox">تم تسجيل المرتجع '+esc(r.ret.docNo)+' بقيمة '+fmtM(r.ret.amount)+' — خُفّضت مديونية العميل بهذه القيمة.</div>';
+}
+function doSaveSetup(){
+  var nc=($("suCode")?$("suCode").value:"").trim();
+  var nc2=($("suCode2")?$("suCode2").value:"").trim();
+  var m=$("setupMsg");
+  if(nc&&nc!==nc2){if(m)m.innerHTML='<div class="err">رمز التهيئة الجديد وتأكيده غير متطابقين.</div>';return;}
+  var r=saveSetupSettings({companyName:$("suName").value,companyNameEn:$("suNameEn").value,commercialReg:$("suReg").value,taxNumber:$("suTax").value,ownerName:$("suOwner").value,ownerPhone:$("suOwnerPhone").value,city:$("suCity").value,district:$("suDistrict").value,street:$("suStreet").value,buildingNo:$("suBuilding").value,postalCode:$("suPostal").value,subNumber:$("suSub").value,address:$("suAddr").value,phones:$("suPhones").value,email:$("suEmail").value,currency:$("suCur").value,vatRate:$("suVat").value,bankBalance:$("suBank").value,safeBalance:$("suSafe").value,newCode:nc||undefined});
+  if(r.error){if(m)m.innerHTML='<div class="err">'+esc(r.error)+'</div>';return;}
+  render();var m2=$("setupMsg");if(m2)m2.innerHTML='<div class="okbox">تم حفظ التهيئة'+(nc?" — ورمز التهيئة الجديد يعمل من الآن.":".")+'</div>';
+}
+function hideAccForm(){state.ui.accForm=null;render();}
+function initUserPerms(eu){
+  var formKey=eu?eu.id:"new";
+  if(state.ui.permUserId===formKey)return;
+  state.ui.permUserId=formKey;
+  state.ui.permRole=eu?eu.role:"gm";
+  /* حساب «1» يعرض دائماً كل الصلاحيات (17/17) — خاناته معطّلة في
+     النموذج فلا يمكن تقليلها من الواجهة أصلاً. */
+  state.ui.permInit=eu?(eu.username==="1"?FULL_PERMS.slice():(Array.isArray(eu.permissions)?eu.permissions.slice():(ROLE_SCREENS[eu.role]||[]).slice())):(ROLE_SCREENS["gm"]||[]).slice();
+}
+function readPermCheckboxes(){var out=[];document.querySelectorAll(".nuPerm:checked").forEach(function(c){out.push(c.value);});return out;}
+function renderReturnItems(){
+  var qid=$("rtQuote")?$("rtQuote").value:"";
+  var sel=$("rtItem");if(!sel)return;
+  var q=quoteById(qid);
+  if(!q){sel.innerHTML='<option value="">— اختر العرض أولاً —</option>';return;}
+  var opts='<option value="">— اختر المادة —</option>';
+  q.items.forEach(function(it){
+    var issued=0;state.material_issues.forEach(function(m){if(String(m.quotationId)===String(q.id)&&String(m.itemName)===String(it.name))issued+=Number(m.qtyIssued)||0;});
+    var max=issued-returnedQtyForItem(q.id,it.name);
+    opts+='<option value="'+esc(it.name)+'"'+(max<=0?" disabled":"")+'>'+esc(it.name)+' — قابل للإرجاع: '+max+' (منصرف '+issued+')</option>';
+  });
+  sel.innerHTML=opts;
+}
+function screenAccounts(){
+  var rev=revenueTotal(),exp=expenseTotal(),net=Math.round((rev-exp)*100)/100;
+  var bank=bankBalanceCalc(),safe=safeBalanceCalc();
+  var period=state.ui.accPeriod||"all";
+  var months=accMonthly();
+  if(period==="month")months=months.slice(-1);
+  else if(period==="3m")months=months.slice(-3);
+  var bd=expenseBreakdown();
+  var DONUT_COLORS=["#2f80ed","#f2994a","#27ae60","#9b51e0","#eb5757","#f2c94c","#56ccf2","#bb6bd9"];
+  var donutStyle="background:#22345c";
+  if(bd.total>0){
+    var stops=[],acc=0;
+    bd.rows.forEach(function(r,i){var pct=r.amount/bd.total*100;stops.push(DONUT_COLORS[i%DONUT_COLORS.length]+" "+acc.toFixed(1)+"% "+(acc+pct).toFixed(1)+"%");acc+=pct;});
+    donutStyle="background:conic-gradient("+stops.join(",")+")";
+  }
+  var maxV=0;months.forEach(function(m){if(m.rev>maxV)maxV=m.rev;if(m.exp>maxV)maxV=m.exp;});
+  var h='<div class="acc"><div class="acc-head"><div><h2>إدارة الحسابات</h2><p style="color:#bcd;margin:.2rem 0">نظام مالي متكامل — الأرقام من بيانات النظام الحقيقية</p></div>'+
+  '<div class="row"><button type="button" class="btn btn-ghost btn-sm'+(period==="all"?" on":"")+'" onclick="setAccPeriod(\'all\')" style="background:rgba(255,255,255,.12);color:#fff">كل الفترات</button>'+
+  '<button type="button" class="btn btn-ghost btn-sm'+(period==="3m"?" on":"")+'" onclick="setAccPeriod(\'3m\')" style="background:rgba(255,255,255,.12);color:#fff">آخر 3 أشهر</button>'+
+  '<button type="button" class="btn btn-ghost btn-sm'+(period==="month"?" on":"")+'" onclick="setAccPeriod(\'month\')" style="background:rgba(255,255,255,.12);color:#fff">الشهر الحالي</button></div></div>';
+  h+='<div class="acc-grid"><div>'+
+  '<div class="sumcards">'+
+  '<div class="sumcard c-bank"><div class="t">🏦 رصيد البنك</div><div class="n">'+fmtM(bank)+'</div></div>'+
+  '<div class="sumcard c-safe"><div class="t">🗄️ رصيد الخزنة</div><div class="n">'+fmtM(safe)+'</div></div>'+
+  '<div class="sumcard c-exp"><div class="t">🪙 إجمالي المصروفات</div><div class="n">'+fmtM(exp)+'</div></div>'+
+  '<div class="sumcard c-rev"><div class="t">💵 إجمالي الإيرادات</div><div class="n">'+fmtM(rev)+'</div></div></div>';
+  h+='<div class="grid c2"><div class="panel"><h3>📊 الأداء المالي خلال الفترة</h3>';
+  if(!months.length)h+='<p style="color:#bcd">لا توجد حركات مالية بعد — سجّل دفعة أو إيراداً أو مصروفاً لتظهر هنا.</p>';
+  else{
+    h+='<div class="bars">'+months.map(function(m){
+      var rh=maxV>0?Math.max(4,Math.round(m.rev/maxV*110)):4;
+      var eh=maxV>0?Math.max(4,Math.round(m.exp/maxV*110)):4;
+      return '<div class="bar-group"><div class="bar-pair"><div class="bar bar-rev" style="height:'+rh+'px" title="إيرادات '+fmtM(m.rev)+'"></div><div class="bar bar-exp" style="height:'+eh+'px" title="مصروفات '+fmtM(m.exp)+'"></div></div><div>'+esc(m.label)+'</div><div style="font-size:.8rem;color:#ffd76a">صافي '+fmtM(m.net)+'</div></div>';
+    }).join("")+'</div><p style="color:#bcd;font-size:.85rem;margin:.4rem 0 0"><span style="color:#2f9e44">■</span> الإيرادات &nbsp; <span style="color:#e03131">■</span> المصروفات</p>';
+  }
+  h+='</div><div class="panel"><h3>📈 توزيع المصروفات حسب التصنيف</h3>';
+  if(bd.total<=0)h+='<p style="color:#bcd">لا توجد مصروفات بعد.</p>';
+  else{
+    h+='<div class="donut-wrap"><div class="donut" style="'+donutStyle+'"></div><div class="legend">'+
+    bd.rows.map(function(r,i){return '<div><span class="dot" style="background:'+DONUT_COLORS[i%DONUT_COLORS.length]+'"></span>'+esc(r.name)+' — <b>'+r.pct+'%</b> ('+fmtM(r.amount)+')</div>';}).join("")+
+    '</div></div><p style="text-align:center;margin:.4rem 0 0"><b>'+fmtM(bd.total)+'</b><br><span style="color:#bcd">إجمالي</span></p>';
+  }
+  h+='</div></div>';
+  h+='<div class="panel"><h3>🧮 ملخص الحسابات</h3><div class="grid c4" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">'+
+  '<div><div style="color:#bcd">إجمالي الإيرادات</div><div style="font-size:1.4rem;font-weight:800;color:#2f9e44">'+fmtM(rev)+'</div></div>'+
+  '<div><div style="color:#bcd">إجمالي المصروفات</div><div style="font-size:1.4rem;font-weight:800;color:#e03131">'+fmtM(exp)+'</div></div>'+
+  '<div><div style="color:#bcd">صافي الربح</div><div style="font-size:1.4rem;font-weight:800;color:#ffd76a">'+fmtM(net)+'</div></div>'+
+  '<div><div style="color:#bcd">تكلفة المواد المنصرفة</div><div style="font-size:1.4rem;font-weight:800">'+fmtM(materialCostTotal())+'</div></div></div></div>';
+  var moves=accountMovements();
+  h+='<div class="panel"><h3>🕒 أحدث الحركات المالية</h3>';
+  if(!moves.length)h+='<p style="color:#bcd">لا توجد حركات مالية بعد.</p>';
+  else{
+    h+='<table><tr><th>التاريخ</th><th>البيان</th><th>التصنيف</th><th>طريقة الدفع</th><th>النوع</th><th>المبلغ</th></tr>';
+    moves.slice(0,10).forEach(function(mv){
+      h+='<tr><td class="num">'+esc(mv.date)+'</td><td>'+esc(mv.desc)+'</td><td>'+esc(mv.category)+'</td><td>'+esc(mv.method)+'</td><td>'+(mv.kind==="revenue"?'<span class="badge b-approved">إيراد</span>':mv.kind==="return"?'<span class="badge b-inspected">مرتجع</span>':'<span class="badge b-rejected">مصروف</span>')+'</td><td class="num">'+fmtM(mv.amount)+'</td></tr>';
+    });
+    h+='</table>';
+  }
+  h+='</div>';
+  /* بطاقة إدارة المستخدمين: تظهر لمن يملك صلاحية شاشة المستخدمين
+     (مدير النظام ودور الحسابات) وتفتح شاشة المستخدمين مباشرة. */
+  if(canSee("users")){
+    h+='<div class="panel"><h3>👥 إدارة المستخدمين</h3><p style="color:#bcd">إضافة المستخدمين وتعديل بياناتهم وأدوارهم وصلاحياتهم من هنا — الحذف وتعيين دور «مدير النظام» ومنح «التقارير الرقابية» لمدير النظام فقط.</p><div class="row"><button type="button" class="btn btn-gold" onclick="goScreen(\'users\')">إدارة المستخدمين</button></div></div>';
+  }
+  h+='</div>';
+  h+='<div class="acc-side">'+
+  '<button type="button" class="btn btn-gold" onclick="goScreen(\'dashboard\')">🏠 الرئيسية</button>'+
+  '<button type="button" class="btn btn-green" onclick="showAccForm(\'revenue\')">➕ تسجيل إيراد</button>'+
+  '<button type="button" class="btn btn-danger" onclick="showAccForm(\'expense\')">➖ تسجيل مصروف</button>'+
+  '<button type="button" class="btn btn-ghost" onclick="showAccMoves()" style="background:rgba(255,255,255,.12);color:#fff">📋 سجل الحركات</button>'+
+  '<button type="button" class="btn btn-ghost" onclick="goScreen(\'reports\')" style="background:rgba(255,255,255,.12);color:#fff">📊 التقارير</button>'+
+  '<button type="button" class="btn btn-ghost" onclick="goScreen(\'settings\')" style="background:rgba(255,255,255,.12);color:#fff">⚙ الإعدادات</button>';
+  if(state.ui.accForm){
+    var isRev=state.ui.accForm==="revenue";
+    h+='<div class="panel"><h3>'+(isRev?"تسجيل إيراد":"تسجيل مصروف")+'</h3><div id="accMsg"></div>'+
+    '<div><label style="color:#fff">المبلغ *</label><input id="acAmt" type="number" min="0" step="0.01" class="inp"></div>'+
+    '<div><label style="color:#fff">التصنيف</label><input id="acCat" class="inp" placeholder="'+(isRev?"مثال: إيراد خدمات":"مثال: رواتب / وقود / إيجار")+'"></div>'+
+    '<div><label style="color:#fff">طريقة الدفع</label><select id="acMethod" class="inp"><option>نقدي</option><option>بنك</option></select></div>'+
+    (isRev?'<div><label style="color:#fff">العميل (اختياري — إن اخترته تُخصم من مديونيته)</label><select id="acClient" class="inp"><option value="">— بدون عميل —</option>'+state.clients.map(function(c){return '<option value="'+esc(c.id)+'">'+esc(c.name)+'</option>';}).join("")+'</select></div>':"")+
+    '<div><label style="color:#fff">البيان</label><input id="acDesc" class="inp" placeholder="وصف الحركة"></div>'+
+    '<div class="row" style="margin-top:.6rem"><button type="button" class="btn btn-gold" onclick="doAccTransaction()">حفظ الحركة</button>'+
+    '<button type="button" class="btn btn-ghost" onclick="hideAccForm()" style="background:rgba(255,255,255,.12);color:#fff">إلغاء</button></div></div>';
+  }
+  h+='</div></div></div>';
+  return h;
+}
+function screenReturns(){
+  var qs=state.quotations.filter(function(q){return q.status==="financial_approved";});
+  var h='<div class="card"><h2>مرتجع المواد</h2><p class="muted">إرجاع مواد منصرفة من عرض معتمد مالياً — تُخفَّض قيمة المرتجع من مديونية العميل فوراً، وتظهر المواد المرتجعة في عرض السعر المرتبط وفي كشف حساب العميل.</p><div id="retMsg"></div>';
+  h+='<div class="form-grid"><div><label>العرض المعتمد مالياً *</label><select id="rtQuote" class="inp" onchange="renderReturnItems()"><option value="">— اختر العرض —</option>'+qs.map(function(q){return '<option value="'+esc(q.id)+'">'+esc(q.number)+' — '+esc((clientById(q.clientId)||{}).name||"")+' — '+fmtM(q.total)+'</option>';}).join("")+'</select></div>'+
+  '<div><label>المادة *</label><select id="rtItem" class="inp"><option value="">— اختر العرض أولاً —</option></select></div>'+
+  '<div><label>الكمية المرتجعة *</label><input id="rtQty" type="number" min="1" step="1" class="inp" value="1"></div>'+
+  '<div><label>ملاحظة</label><input id="rtNote" class="inp" placeholder="اختياري"></div></div>'+
+  '<div class="row" style="margin-top:.6rem"><button type="button" class="btn btn-navy" onclick="doReturn()">تسجيل المرتجع وتخفيض المديونية</button></div></div>';
+  h+='<div class="card"><h2>المرتجعات المسجلة</h2>';
+  if(!state.material_returns.length)h+='<p class="muted">لا توجد مرتجعات بعد.</p>';
+  else{h+='<table><tr><th>رقم المستند</th><th>العرض</th><th>العميل</th><th>المادة</th><th>الكمية</th><th>سعر الوحدة</th><th>القيمة</th><th>التاريخ</th></tr>';
+  state.material_returns.slice().reverse().forEach(function(r){var q=quoteById(r.quotationId);h+='<tr><td class="num">'+esc(r.docNo)+'</td><td class="num">'+(q?esc(q.number):"—")+'</td><td>'+esc((clientById(r.clientId)||{}).name||"")+'</td><td>'+esc(r.itemName)+'</td><td class="num">'+r.qty+'</td><td class="num">'+fmtM(r.unitPrice)+'</td><td class="num">'+fmtM(r.amount)+'</td><td class="num">'+esc(r.date)+'</td></tr>';});
+  h+='</table>';}
+  return h+'</div>';
+}
+function setAccPeriod(p){state.ui.accPeriod=p;render();}
+function showAccForm(kind){state.ui.accForm=kind;render();}
+function showAccMoves(){var els=document.querySelectorAll(".acc .panel");var last=els[els.length-1];if(last&&last.scrollIntoView)try{last.scrollIntoView();}catch(e){}}
+function showEditUser(uid2){var u=userById(uid2);if(!u)return;if(state.user&&state.user.role!=="admin"&&(u.username==="1"||u.role==="admin")){if(typeof alert==="function")alert("لا يمكن تعديل هذا الحساب — التعديل لمدير النظام فقط.");return;}state.ui.editUserId=uid2;render();}
+function togglePwById(id){var p=$(id);if(!p)return;p.type=(p.type==="password")?"text":"password";}
 </script>
 </body>
 </html>
