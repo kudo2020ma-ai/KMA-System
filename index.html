@@ -152,6 +152,13 @@ footer{text-align:center;color:var(--muted);font-size:.85rem;padding:1rem}
 .acc .legend .dot{display:inline-block;width:12px;height:12px;border-radius:3px;margin-left:.3rem}
 @media screen and (max-width:760px){.acc .acc-grid{grid-template-columns:1fr}}
 @media screen and (max-width:640px){main{padding:.6rem}nav.tabs{top:96px}.stat .n{font-size:1.4rem}}
+/* نافذة اختيار الأصناف (F9) وقائمة الإكمال التلقائي */
+.item-modal{position:fixed;inset:0;background:rgba(15,42,74,.55);display:flex;align-items:flex-start;justify-content:center;padding:4rem 1rem 1rem;z-index:50}
+.item-modal-card{background:#fff;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.35);width:100%;max-width:560px;padding:1rem 1.2rem}
+.item-modal-card h3{margin:.1rem 0 .6rem;color:var(--navy)}
+.item-suggest{border:1px solid var(--border);background:#fff;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);margin-top:.25rem;max-height:220px;overflow:auto}
+.item-pick-row{padding:.45rem .6rem;cursor:pointer;line-height:1.6}
+.item-pick-row:hover{background:#eef1f5}
 </style>
 </head>
 <body>
@@ -179,7 +186,7 @@ function companyInfo(){var s=state.settings[0]||{};var o={};var k;for(k in COMPA
 var BKKEY="MSHRY_backup_company";
 var BKMETA="MSHRY_backup_meta_company";
 var ADMIN_USER="1";
-var COLLECTIONS=["users","clients","projects","assignments","media","quotations","approvals","contracts","material_issues","payments","notifications","settings","counters","material_returns","transactions"];
+var COLLECTIONS=["users","clients","projects","assignments","media","quotations","approvals","contracts","material_issues","payments","notifications","settings","counters","material_returns","transactions","items","audit_log"];
 var PROJECT_TYPES=["تركيب كاميرات","صيانة","توريد أدوات سلامة","مضخات","أخرى"];
 var CONTRACT_TYPES=["صيانة","كاميرات","نظافة","مكافحة حشرات"];
 var ROLES={
@@ -193,11 +200,11 @@ var ROLES={
 };
 /* الصلاحيات: ما الذي يراه كل دور */
 var ROLE_SCREENS={
-  gm:["dashboard","projects","tasks","quotations","approvals","materials","returns","contracts","financial","accounts","reports","users","employees","notifications","settings"],
-  projects_manager:["dashboard","projects","tasks","quotations","approvals","notifications"],
+  gm:["dashboard","projects","tasks","quotations","approvals","materials","returns","contracts","financial","accounts","reports","audit","users","employees","notifications","settings","items"],
+  projects_manager:["dashboard","projects","tasks","quotations","approvals","notifications","items"],
   technician:["tasks","notifications"],
-  accounts:["dashboard","materials","returns","financial","accounts","reports","notifications"],
-  storekeeper:["materials","returns","notifications"],
+  accounts:["dashboard","materials","returns","financial","accounts","reports","notifications","items"],
+  storekeeper:["materials","returns","notifications","items"],
   hr:["employees","notifications"],
   secretariat:["contracts","notifications"]
 };
@@ -206,15 +213,19 @@ var SCREEN_TITLES={
   quotations:"عروض الأسعار",approvals:"التعميد (المدير العام)",
   materials:"صرف المواد",returns:"مرتجع المواد",contracts:"العقود",financial:"الاعتماد المالي والمديونيات",
   accounts:"إدارة الحسابات",
-  reports:"التقارير — ميزان المراجعة",users:"المستخدمون",employees:"الموظفون والإجازات",
-  notifications:"الإشعارات",settings:"الإعدادات"
+  reports:"التقارير — ميزان المراجعة",audit:"التقارير الرقابية",users:"المستخدمون",employees:"الموظفون والإجازات",
+  notifications:"الإشعارات",settings:"الإعدادات",items:"الأصناف"
 };
+/* الشاشات التي تظهر كخانات اختيار في صلاحيات المستخدم — كل الشاشات
+   عدا «التقارير الرقابية» فهي للمدير العام فقط ولا تُمنح لأحد. */
+var PERM_SCREENS=["dashboard","projects","tasks","quotations","approvals","materials","returns","contracts","financial","accounts","reports","users","employees","notifications","settings","items"];
 function $(id){return document.getElementById(id);}
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
 function today(){var d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
 function nowISO(){return new Date().toISOString();}
 function fmtM(n){n=Number(n)||0;return n.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fmtDate(s){return s?String(s).slice(0,10):"—";}
+function fmtDateTime(s){if(!s)return "—";var t=String(s);return t.slice(0,10)+" "+t.slice(11,19);}
 function uid(p){return (p||"id")+"-"+Date.now().toString(36)+"-"+Math.floor(Math.random()*1e6).toString(36);}
 function roleName(r){return ROLES[r]?ROLES[r].name:r;}
 function projectStatusLabel(s){return {"new":"جديد","assigned":"مُسند للفنيين","inspected":"تمت المعاينة","inspection_rejected":"معاينة مرفوضة","quoted":"عرض سعر","client_accepted":"قبل العميل","client_rejected":"رفض العميل","gm_approved":"معمّد","gm_rejected":"رفض التعميد","contracted":"العقد جاهز","issued":"المواد منصرفة","approved":"معتمد مالياً","completed":"مكتمل"}[s]||s;}
@@ -228,9 +239,9 @@ return '<span class="badge '+cls+'">'+esc(kind==="project"?projectStatusLabel(s)
 function defState(){return {
   users:[],clients:[],projects:[],assignments:[],media:[],quotations:[],
   approvals:[],contracts:[],material_issues:[],payments:[],notifications:[],
-  material_returns:[],transactions:[],
-  settings:[{id:"main",companyName:"شركة بصمة المشاعر المتطورة",companyNameEn:"BASSMAT ALMASHAEIR ADVANCED COMPANY",commercialReg:"4031264916",address:"المملكة العربية السعودية — العزيزية، شارع عبدالله الخياط",phones:"0555645215 - 0125124905",email:"bassmat.co@gmail.com",currency:"ر.س",vatRate:15,setupCode:"1805",bankBalance:0,safeBalance:0}],
-  counters:[{id:"main",project:0,quotation:0,contract:0,payment:0,client:0,"return":0,transaction:0}],
+  material_returns:[],transactions:[],items:[],audit_log:[],
+  settings:[{id:"main",companyName:"شركة بصمة المشاعر المتطورة",companyNameEn:"BASSMAT ALMASHAEIR ADVANCED COMPANY",commercialReg:"4031264916",address:"المملكة العربية السعودية — العزيزية، شارع عبدالله الخياط",phones:"0555645215 - 0125124905",email:"bassmat.co@gmail.com",currency:"ر.س",vatRate:15,setupCode:"1805",bankBalance:0,safeBalance:0,ownerName:"",ownerPhone:"",taxNumber:"",city:"",district:"",street:"",buildingNo:"",postalCode:"",subNumber:""}],
+  counters:[{id:"main",project:0,quotation:0,contract:0,payment:0,client:0,"return":0,transaction:0,item:0}],
   employees:[],leaves:[]
 };}
 function loadState(){
@@ -245,11 +256,20 @@ function normalizeState(s){
   COLLECTIONS.forEach(function(c){if(Array.isArray(s[c]))d[c]=s[c];});
   if(Array.isArray(s.employees))d.employees=s.employees;
   if(Array.isArray(s.leaves))d.leaves=s.leaves;
+  /* دمج الإعدادات مع الافتراضيات: سجلات قديمة بلا الحقول الجديدة
+     (بيانات المالك والعنوان الوطني والرقم الضريبي) تُملأ بقيمها
+     الافتراضية الفارغة بدل تركها undefined. */
+  if(Array.isArray(d.settings)&&d.settings.length){
+    var ds=defState().settings[0];
+    Object.keys(ds).forEach(function(k){if(d.settings[0][k]===undefined)d.settings[0][k]=ds[k];});
+  }
+  d.clients.forEach(function(c){if(c.taxNumber===undefined)c.taxNumber="";});
+  if(!Array.isArray(d.items))d.items=[];
   return d;
 }
 var state=loadState();
 state.user=null;state.screen="dashboard";state.ui={};
-function defaultAdminUser(){return {id:"u-1",username:"1",password:"1",fullName:"المدير العام",role:"gm",companyId:COMPANY_ID,active:true,createdAt:nowISO()};}
+function defaultAdminUser(){return {id:"u-1",username:"1",password:"1",fullName:"المدير العام",role:"gm",phone:"",permissions:null,companyId:COMPANY_ID,active:true,createdAt:nowISO()};}
 function ensureAdminUser(){
   if(!Array.isArray(state.users))state.users=[];
   var found=null;
@@ -262,7 +282,7 @@ function ensureAdminUser(){
 ensureAdminUser();
 function saveLocal(){try{var j=JSON.stringify(state);localStorage.setItem(COMPANY_KEY,j);localStorage.setItem(BKKEY,j);localStorage.setItem(BKMETA,new Date().toISOString());}catch(e){}}
 function save(){saveLocal();scheduleSyncPush();}
-function counters(){if(!state.counters||!state.counters.length)state.counters=[{id:"main",project:0,quotation:0,contract:0,payment:0,client:0}];return state.counters[0];}
+function counters(){if(!state.counters||!state.counters.length)state.counters=[{id:"main",project:0,quotation:0,contract:0,payment:0,client:0,"return":0,transaction:0,item:0}];return state.counters[0];}
 function nextSerial(kind,prefix){
   var c=counters();c[kind]=(Number(c[kind])||0)+1;
   var n=prefix+"-"+String(c[kind]).padStart(4,"0");
@@ -270,8 +290,8 @@ function nextSerial(kind,prefix){
   return n;
 }
 function isSerialUsed(kind,num){
-  var list=kind==="project"?state.projects:kind==="quotation"?state.quotations:state.contracts;
-  var field=kind==="project"?"number":kind==="quotation"?"number":"number";
+  var list=kind==="project"?state.projects:kind==="quotation"?state.quotations:kind==="item"?state.items:state.contracts;
+  var field=kind==="item"?"code":"number";
   for(var i=0;i<list.length;i++){if(String(list[i][field])===String(num))return true;}
   return false;
 }
@@ -279,7 +299,7 @@ function peekSerial(kind,prefix){var c=counters();return prefix+"-"+String((Numb
 
 /* ---------- المزامنة مع قاعدة الخادم (العقد المعتمد نفسه) ---------- */
 var SYNC={mode:"local",token:null,companyId:null,busy:false,lastSync:null,checked:false,serverMode:null,serverHealthy:true,pushFailed:0};
-var SYNC_COLLECTIONS=[["users","users"],["clients","clients"],["projects","projects"],["assignments","assignments"],["media","media"],["quotations","quotations"],["approvals","approvals"],["contracts","contracts"],["material_issues","material_issues"],["payments","payments"],["notifications","notifications"],["settings","settings"],["counters","counters"],["material_returns","material_returns"],["transactions","transactions"]];
+var SYNC_COLLECTIONS=[["users","users"],["clients","clients"],["projects","projects"],["assignments","assignments"],["media","media"],["quotations","quotations"],["approvals","approvals"],["contracts","contracts"],["material_issues","material_issues"],["payments","payments"],["notifications","notifications"],["settings","settings"],["counters","counters"],["material_returns","material_returns"],["transactions","transactions"],["items","items"],["audit_log","audit_log"]];
 var SYNC_PUSH_TIMER=null;
 function syncHeaders(){var h={"Content-Type":"application/json"};if(SYNC.token)h["Authorization"]="Bearer "+SYNC.token;return h;}
 function syncSetBadge(){
@@ -432,7 +452,8 @@ function doLogin(){
     var u=findLocalUser(userObj.username);
     if(!u){fail("بيانات الدخول غير صحيحة.");return false;}
     if(u.active===false){fail("هذا الحساب موقوف — راجع المدير العام.");return false;}
-    state.user={id:u.id,username:u.username,fullName:u.fullName||u.username,role:u.role};
+    state.user={id:u.id,username:u.username,fullName:u.fullName||u.username,role:u.role,permissions:Array.isArray(u.permissions)?u.permissions.slice():null};
+    logAudit("login_success","تسجيل دخول ناجح للمستخدم "+u.username+" ("+roleName(u.role)+")","","الدخول");
     state.screen=(u.role==="technician")?"tasks":(u.role==="hr"?"employees":(u.role==="storekeeper"?"materials":(u.role==="secretariat"?"contracts":"dashboard")));
     if(err)err.classList.add("hidden");
     saveLocal();
@@ -450,12 +471,27 @@ function doLogin(){
   }
   var local2=localLogin(un,pw);
   if(local2&&!local2.error)return Promise.resolve(finish(local2));
-  if(local2&&local2.error){fail(local2.error);return Promise.resolve(false);}
+  if(local2&&local2.error){logAudit("login_failed","محاولة دخول فاشلة للمستخدم "+un+" — "+local2.error,"","الدخول",{username:un,fullName:un,role:"—"});saveLocal();fail(local2.error);return Promise.resolve(false);}
+  logAudit("login_failed","محاولة دخول فاشلة للمستخدم "+un+" — بيانات غير صحيحة","","الدخول",{username:un,fullName:un,role:"—"});saveLocal();
   fail("بيانات الدخول غير صحيحة.");return Promise.resolve(false);
 }
-function logout(){state.user=null;state.screen="dashboard";try{sessionStorage.removeItem("MSHRY_sync_token");}catch(e){}SYNC.token=null;render();}
+function logout(){
+  if(state.user){logAudit("logout","تسجيل خروج المستخدم "+(state.user.fullName||state.user.username)+" ("+state.user.username+")","","الدخول");saveLocal();if(SYNC.mode==="server"&&SYNC.token)syncPushNow();}
+  state.user=null;state.screen="dashboard";try{sessionStorage.removeItem("MSHRY_sync_token");}catch(e){}SYNC.token=null;render();
+}
 function currentUser(){return state.user;}
-function canSee(screen){var u=state.user;if(!u)return false;if(u.role==="gm")return true;var list=ROLE_SCREENS[u.role]||[];return list.indexOf(screen)>=0;}
+/* الصلاحيات الفعلية للمستخدم: المدير العام يرى كل الشاشات دائماً؛
+   غيره يرى قائمة permissions الخاصة به إن كانت مصفوفة، وإلا
+   افتراضي دوره من ROLE_SCREENS. السجل الكامل للمستخدم (وفيه
+   permissions) يُقرأ من state.users لأن state.user نسخة مختصرة. */
+function userScreens(u){
+  if(!u)return [];
+  if(u.role==="gm")return Object.keys(SCREEN_TITLES);
+  var full=userById(u.id);
+  if(full&&Array.isArray(full.permissions))return full.permissions;
+  return ROLE_SCREENS[u.role]||[];
+}
+function canSee(screen){var u=state.user;if(!u)return false;return userScreens(u).indexOf(screen)>=0;}
 function canPrice(){var u=state.user;if(!u)return false;return u.role!=="technician"&&u.role!=="hr";}
 function isGM(){return state.user&&state.user.role==="gm";}
 function isAccounts(){return state.user&& (state.user.role==="accounts"||state.user.role==="gm");}
@@ -473,6 +509,39 @@ function myNotifications(){
     return false;
   });
 }
+/* ---------- سجل التدقيق (التقارير الرقابية) ----------
+   كل عملية في النظام تُسجَّل تلقائياً مع التاريخ والوقت والمستخدم.
+   السجل محمي: لا زر حذف لسجلاته في الواجهة، ولا يُشمل في النسخة
+   الاحتياطية، ولا يُستبدل عند استرجاع نسخة (يبقى كما هو ويُضاف إليه
+   حدث الاسترجاع نفسه)، ولا يُمسح عند تصفير البيانات إلا بطلب صريح
+   من المستخدم. يُزامَن مع الخادم كمجموعة audit_log كباقي المجموعات. */
+var AUDIT_ACTIONS={
+  login_success:"تسجيل دخول",login_failed:"محاولة دخول فاشلة",logout:"تسجيل خروج",
+  create_client:"إنشاء عميل",create_project:"إنشاء مشروع",delete_project:"حذف مشروع",
+  assign:"إسناد فنيين",confirm_receipt:"تأكيد استلام مهمة",add_media:"رفع وسائط معاينة",
+  submit_inspection:"إرسال تقرير معاينة",inspection_accept:"قبول المعاينة",inspection_reject:"رفض المعاينة",
+  create_quotation:"إنشاء عرض سعر",send_quotation:"إرسال عرض السعر للعميل",
+  client_accept:"قبول العميل للعرض",client_reject:"رفض العميل للعرض",
+  gm_approve:"تعميد المدير العام",gm_reject:"رفض تعميد المدير العام",
+  issue_material:"صرف مواد",prepare_contract:"تجهيز عقد",financial_approve:"الاعتماد المالي",
+  record_payment:"تسجيل دفعة",set_opening:"تعديل رصيد افتتاحي",create_return:"مرتجع مواد",
+  record_transaction:"تسجيل حركة حسابات",create_user:"إنشاء مستخدم",update_user:"تعديل مستخدم",
+  delete_user:"حذف مستخدم",save_settings:"حفظ الإعدادات",save_setup:"حفظ تهيئة النظام",
+  backup:"تنزيل نسخة احتياطية",restore:"استرجاع نسخة احتياطية",
+  create_item:"إنشاء صنف",update_item:"تعديل صنف",delete_item:"حذف صنف",
+  import_items:"استيراد أصناف",export_items:"تصدير أصناف",
+  create_maintenance_contract:"إنشاء عقد صيانة تلقائي",assign_whatsapp:"إرسال واتساب للفني",
+  update_permissions:"تغيير صلاحيات مستخدم",print_quotation:"طباعة عرض سعر",print_report:"طباعة تقرير رقابي"
+};
+function auditActionLabel(a){return AUDIT_ACTIONS[a]||a;}
+function auditRoleLabel(r){return r==="system"?"النظام":roleName(r);}
+function logAudit(action,summary,docNo,screen,who){
+  var u=who||state.user;
+  var e={id:uid("al"),at:nowISO(),username:u?u.username:"—",fullName:u?(u.fullName||u.username):"النظام",role:u?u.role:"system",action:action,screen:screen||"",docNo:docNo||"",summary:String(summary||"")};
+  if(!Array.isArray(state.audit_log))state.audit_log=[];
+  state.audit_log.push(e);
+  return e;
+}
 function clientById(id){for(var i=0;i<state.clients.length;i++)if(String(state.clients[i].id)===String(id))return state.clients[i];return null;}
 function projectById(id){for(var i=0;i<state.projects.length;i++)if(String(state.projects[i].id)===String(id))return state.projects[i];return null;}
 function quoteById(id){for(var i=0;i<state.quotations.length;i++)if(String(state.quotations[i].id)===String(id))return state.quotations[i];return null;}
@@ -480,10 +549,10 @@ function userById(id){for(var i=0;i<state.users.length;i++)if(String(state.users
 </script>
 <script>
 /* ---------- منطق العمل ---------- */
-function addClient(name,phone,address,openingBalance){
+function addClient(name,phone,address,openingBalance,taxNumber){
   name=String(name||"").trim();if(!name)return {error:"اسم العميل مطلوب."};
-  var c={id:uid("cl"),name:name,phone:String(phone||"").trim(),address:String(address||"").trim(),openingBalance:Number(openingBalance)||0,createdAt:nowISO(),updatedAt:nowISO()};
-  state.clients.push(c);save();return {client:c};
+  var c={id:uid("cl"),name:name,phone:String(phone||"").trim(),address:String(address||"").trim(),taxNumber:String(taxNumber||"").trim(),openingBalance:Number(openingBalance)||0,createdAt:nowISO(),updatedAt:nowISO()};
+  state.clients.push(c);logAudit("create_client","إنشاء عميل جديد: "+c.name+(c.phone?" — "+c.phone:""),"","إدارة المشاريع");save();return {client:c};
 }
 function addProject(clientId,type,title,address,description,number){
   var cl=clientById(clientId);if(!cl)return {error:"اختر عميلاً موجوداً أو سجّل عميلاً جديداً أولاً."};
@@ -491,7 +560,7 @@ function addProject(clientId,type,title,address,description,number){
   number=String(number||"").trim()||nextSerial("project","P");
   if(isSerialUsed("project",number))return {error:"رقم المشروع «"+number+"» مستخدم من قبل — أدخل رقماً آخر."};
   var p={id:uid("pr"),number:number,clientId:cl.id,clientName:cl.name,type:type,title:String(title||"").trim()||type,address:String(address||cl.address||"").trim(),description:String(description||"").trim(),status:"new",createdAt:nowISO(),updatedAt:nowISO()};
-  state.projects.push(p);save();return {project:p};
+  state.projects.push(p);logAudit("create_project","إنشاء مشروع "+p.number+" للعميل "+cl.name+" — "+p.type,p.number,"إدارة المشاريع");save();return {project:p};
 }
 function assignTechnicians(projectId,technicianIds){
   var p=projectById(projectId);if(!p)return {error:"المشروع غير موجود."};
@@ -508,34 +577,34 @@ function assignTechnicians(projectId,technicianIds){
     notifyUser(t.id,"مهمة جديدة: "+p.title,"العنوان: "+p.address+" — العميل: "+p.clientName+" ("+clPhone+") — العمل المطلوب: "+p.description+" — نوع المشروع: "+p.type,{projectId:p.id});
   });
   if(!assigned.length)return {error:"الفنيون المختارون مُسندون لهذا المشروع من قبل."};
-  p.status="assigned";p.updatedAt=nowISO();save();return {assigned:assigned};
+  p.status="assigned";p.updatedAt=nowISO();logAudit("assign","إسناد فنيين للمشروع "+p.number+": "+assigned.map(function(a){return a.technicianName;}).join("، "),p.number,"إدارة المشاريع");save();return {assigned:assigned};
 }
 function confirmReceipt(assignmentId){
   var a=null;for(var i=0;i<state.assignments.length;i++)if(String(state.assignments[i].id)===String(assignmentId))a=state.assignments[i];
   if(!a)return {error:"المهمة غير موجودة."};
   if(state.user&&String(a.technicianId)!==String(state.user.id)&&state.user.role!=="gm")return {error:"هذه المهمة ليست لك."};
-  a.status="accepted";a.acceptedAt=nowISO();save();return {assignment:a};
+  a.status="accepted";a.acceptedAt=nowISO();var _cp=projectById(a.projectId);logAudit("confirm_receipt","تأكيد استلام مهمة المشروع "+(_cp?_cp.number:""),_cp?_cp.number:"","مهامي");save();return {assignment:a};
 }
 function addMedia(projectId,kind,name,size,dataUrl,note){
   var p=projectById(projectId);if(!p)return {error:"المشروع غير موجود."};
   if(kind==="photo"&&!dataUrl)return {error:"لم تُرفق صورة."};
   var m={id:uid("md"),projectId:p.id,kind:kind,name:String(name||"").trim()||(kind==="photo"?"صورة":"فيديو"),size:Number(size)||0,dataUrl:kind==="photo"?dataUrl:null,note:String(note||"").trim(),uploadedBy:state.user?state.user.username:"—",createdAt:nowISO()};
-  state.media.push(m);save();return {media:m};
+  state.media.push(m);logAudit("add_media","رفع "+(kind==="photo"?"صورة":"فيديو")+" معاينة للمشروع "+p.number+" — "+m.name,p.number,"مهامي");save();return {media:m};
 }
 function submitInspection(projectId){
   var p=projectById(projectId);if(!p)return {error:"المشروع غير موجود."};
   var photos=state.media.filter(function(m){return String(m.projectId)===String(projectId)&&m.kind==="photo";});
   if(!photos.length)return {error:"ارفع صورة واحدة على الأقل للموقع قبل إرسال تقرير المعاينة."};
-  p.status="inspected";p.updatedAt=nowISO();save();
+  p.status="inspected";p.updatedAt=nowISO();logAudit("submit_inspection","إرسال تقرير معاينة المشروع "+p.number,p.number,"مهامي");save();
   notifyRole("projects_manager","تقرير معاينة جاهز: "+p.title,"الفني أرسل صور وفيديو المعاينة للمشروع "+p.number+" ("+p.clientName+") — راجعها واقبل أو ارفض بسبب موثق.",{projectId:p.id});
   return {project:p};
 }
 function pmDecision(projectId,decision,reason){
   var p=projectById(projectId);if(!p)return {error:"المشروع غير موجود."};
-  if(decision==="accept"){p.status="inspected";p.updatedAt=nowISO();save();return {project:p};}
+  if(decision==="accept"){p.status="inspected";p.updatedAt=nowISO();logAudit("inspection_accept","قبول معاينة المشروع "+p.number,p.number,"إدارة المشاريع");save();return {project:p};}
   reason=String(reason||"").trim();
   if(!reason)return {error:"الرفض يتطلب سبباً موثقاً — اكتب السبب."};
-  p.status="inspection_rejected";p.inspectionRejectReason=reason;p.updatedAt=nowISO();save();
+  p.status="inspection_rejected";p.inspectionRejectReason=reason;p.updatedAt=nowISO();logAudit("inspection_reject","رفض معاينة المشروع "+p.number+" — السبب: "+reason,p.number,"إدارة المشاريع");save();
   state.assignments.forEach(function(a){if(String(a.projectId)===String(p.id))notifyUser(a.technicianId,"رفض معاينة المشروع "+p.number,"سبب الرفض: "+reason,{projectId:p.id});});
   return {project:p};
 }
@@ -554,27 +623,29 @@ function createQuotation(projectId,items,maintenance,number){
   if(isSerialUsed("quotation",number))return {error:"رقم العرض «"+number+"» مستخدم من قبل — أدخل رقماً آخر."};
   var maint={included:!!(maintenance&&maintenance.included),type:String((maintenance&&maintenance.type)||"").trim(),amount:Number((maintenance&&maintenance.amount)||0)||0,duration:String((maintenance&&maintenance.duration)||"").trim()};
   var t=quoteTotals(items,maint.included?maint.amount:0);
-  var q={id:uid("qt"),number:number,projectId:p.id,clientId:p.clientId,items:items.map(function(it){return {name:String(it.name).trim(),qty:Number(it.qty),price:Number(it.price)};}),maintenance:maint,subtotal:t.subtotal,vat:t.vat,total:t.total,status:"draft",createdAt:nowISO(),updatedAt:nowISO()};
+  var q={id:uid("qt"),number:number,projectId:p.id,clientId:p.clientId,items:items.map(function(it){return {name:String(it.name).trim(),qty:Number(it.qty),price:Number(it.price),unit:String(it.unit||"").trim()};}),maintenance:maint,subtotal:t.subtotal,vat:t.vat,total:t.total,status:"draft",createdAt:nowISO(),updatedAt:nowISO()};
   state.quotations.push(q);
-  p.status="quoted";p.updatedAt=nowISO();save();return {quotation:q};
+  p.status="quoted";p.updatedAt=nowISO();logAudit("create_quotation","إنشاء عرض سعر "+q.number+" للمشروع "+p.number+" — الإجمالي "+fmtM(q.total),q.number,"عروض الأسعار");save();return {quotation:q};
 }
 function sendQuotation(quotationId){
   var q=quoteById(quotationId);if(!q)return {error:"العرض غير موجود."};
-  q.status="sent";q.sentAt=nowISO();q.updatedAt=nowISO();save();return {quotation:q};
+  if(q.status!=="draft")return {error:"لا يمكن إرسال العرض — حالته الحالية «"+quoteStatusLabel(q.status)+"» وليست مسودة."};
+  q.status="sent";q.sentAt=nowISO();q.updatedAt=nowISO();logAudit("send_quotation","إرسال عرض السعر "+q.number+" للعميل",q.number,"عروض الأسعار");save();return {quotation:q};
 }
 function clientResponse(quotationId,decision,note){
   var q=quoteById(quotationId);if(!q)return {error:"العرض غير موجود."};
+  if(q.status!=="sent")return {error:"لا يمكن تسجيل رد العميل — العرض لم يُرسل له بعد (حالته «"+quoteStatusLabel(q.status)+"»)."};
   var p=projectById(q.projectId);
   if(decision==="accept"){
     q.status="client_accepted";q.clientResponseNote=String(note||"").trim();q.updatedAt=nowISO();
     if(p){p.status="client_accepted";p.updatedAt=nowISO();}
-    save();
+    logAudit("client_accept","قبول العميل لعرض السعر "+q.number,q.number,"عروض الأسعار");save();
     notifyRole("gm","عميل قبل عرض السعر "+q.number,"العميل "+(p?p.clientName:"")+" قبل العرض بقيمة "+fmtM(q.total)+" — يلزم التعميد الإلكتروني من المدير العام.",{quotationId:q.id,projectId:q.projectId});
     return {quotation:q};
   }
   q.status="cancelled";q.clientResponseNote=String(note||"").trim();q.updatedAt=nowISO();
   if(p){p.status="client_rejected";p.updatedAt=nowISO();}
-  save();return {quotation:q};
+  logAudit("client_reject","رفض العميل لعرض السعر "+q.number,q.number,"عروض الأسعار");save();return {quotation:q};
 }
 function gmApprove(quotationId){
   var q=quoteById(quotationId);if(!q)return {error:"العرض غير موجود."};
@@ -584,20 +655,33 @@ function gmApprove(quotationId){
   state.approvals.push({id:uid("ap"),quotationId:q.id,projectId:q.projectId,decision:"approved",by:u?u.username:"—",name:u?u.fullName:"—",date:today(),createdAt:nowISO()});
   var p=projectById(q.projectId);if(p){p.status="gm_approved";p.updatedAt=nowISO();}
   q.items.forEach(function(it){state.material_issues.push({id:uid("mi"),quotationId:q.id,projectId:q.projectId,itemName:it.name,qtyOrdered:Number(it.qty),qtyIssued:0,issuedBy:null,date:null});});
-  save();
+  /* عقد الصيانة التلقائي: إن كان العرض يشمل عقد صيانة، يُنشأ سجل عقد
+     فور التعميد برقم متسلسل وحالة prepared ومصدر maintenance، فيظهر
+     في شاشة العقود دون انتظار تجهيز السكرتارية. العقد وثيقة فقط —
+     لا ينشئ مديونية جديدة (المديونية هي إجمالي العرض عند الاعتماد
+     المالي)، فلا ازدواج في الحسابات. */
+  var maintContract=null;
+  if(q.maintenance&&q.maintenance.included){
+    var cn=nextSerial("contract","C");
+    maintContract={id:uid("ct"),number:cn,quotationId:q.id,projectId:q.projectId,clientId:q.clientId,type:String(q.maintenance.type||"صيانة"),fileName:"",status:"prepared",source:"maintenance",amount:Number(q.maintenance.amount)||0,duration:String(q.maintenance.duration||""),preparedBy:u?u.username:"—",createdAt:nowISO()};
+    state.contracts.push(maintContract);
+    logAudit("create_maintenance_contract","إنشاء عقد صيانة تلقائي "+cn+" ("+maintContract.type+" — "+fmtM(maintContract.amount)+" — "+maintContract.duration+") لعرض السعر "+q.number,cn,"العقود");
+  }
+  logAudit("gm_approve","تعميد المدير العام لعرض السعر "+q.number+" — الإجمالي "+fmtM(q.total),q.number,"التعميد (المدير العام)");save();
   notifyRole("accounts","عرض معمّد — ابدأ صرف المواد "+q.number,"المدير العام عمّد العرض. اصرف المواد لكل بند من شاشة صرف المواد.",{quotationId:q.id,projectId:q.projectId});
   notifyRole("storekeeper","عرض معمّد — ابدأ صرف المواد "+q.number,"المدير العام عمّد العرض. اصرف المواد لكل بند من شاشة صرف المواد.",{quotationId:q.id,projectId:q.projectId});
   notifyRole("secretariat","عرض معمّد — جهّز العقد "+q.number,"المدير العام عمّد العرض. جهّز العقد من شاشة العقود.",{quotationId:q.id,projectId:q.projectId});
-  return {quotation:q};
+  return {quotation:q,maintenanceContract:maintContract};
 }
 function gmReject(quotationId,reason){
   var q=quoteById(quotationId);if(!q)return {error:"العرض غير موجود."};
+  if(q.status!=="client_accepted")return {error:"لا يمكن رفض التعميد — العرض لم يقبله العميل بعد (حالته «"+quoteStatusLabel(q.status)+"»)."};
   reason=String(reason||"").trim();if(!reason)return {error:"رفض التعميد يتطلب سبباً — اكتبه."};
   var u=state.user;
   q.status="gm_rejected";q.gmRejectReason=reason;q.updatedAt=nowISO();
   state.approvals.push({id:uid("ap"),quotationId:q.id,projectId:q.projectId,decision:"rejected",reason:reason,by:u?u.username:"—",name:u?u.fullName:"—",date:today(),createdAt:nowISO()});
   var p=projectById(q.projectId);if(p){p.status="gm_rejected";p.updatedAt=nowISO();}
-  save();
+  logAudit("gm_reject","رفض تعميد عرض السعر "+q.number+" — السبب: "+reason,q.number,"التعميد (المدير العام)");save();
   notifyRole("projects_manager","رفض المدير العام تعميد العرض "+q.number,"السبب: "+reason+" — عاد العرض إليك للمراجعة.",{quotationId:q.id,projectId:q.projectId});
   return {quotation:q};
 }
@@ -608,7 +692,15 @@ function issueMaterial(issueId,qty){
   if(qty<=0)return {error:"أدخل كمية منصرفة أكبر من صفر."};
   var remaining=mi.qtyOrdered-mi.qtyIssued;
   if(qty>remaining)return {error:"الكمية المطلوبة ("+qty+") أكبر من المتبقي ("+remaining+") لهذا البند."};
-  mi.qtyIssued+=qty;mi.issuedBy=state.user?state.user.username:"—";mi.date=today();mi.updatedAt=nowISO();save();return {issue:mi};
+  /* رصيد المخزون: إن كان البند مسجلاً صنفاً في شاشة الأصناف، لا يُصرف
+     أكثر من الكمية المتاحة فيه، وتُخصم الكمية المنصرفة من رصيده فوراً.
+     البنود غير المسجلة أصنافاً (نص حر في العرض) لا يقيّدها المخزون.
+     (الفحص قبل أي تعديل حتى لا يتلوث الرصيد عند الرفض.) */
+  var _it=itemByName(mi.itemName);
+  if(_it&&qty>Number(_it.qty||0))return {error:"لا يمكن صرف "+qty+" من «"+mi.itemName+"» — الكمية المتاحة في المخزون "+Number(_it.qty||0)+" فقط."};
+  mi.qtyIssued+=qty;mi.issuedBy=state.user?state.user.username:"—";mi.date=today();mi.updatedAt=nowISO();
+  if(_it){_it.qty=Number(_it.qty||0)-qty;_it.updatedAt=nowISO();}
+  var _iq=quoteById(mi.quotationId);logAudit("issue_material","صرف "+qty+" من "+mi.itemName+" لعرض السعر "+(_iq?_iq.number:"")+" (المنصرف الآن "+mi.qtyIssued+" من "+mi.qtyOrdered+")",_iq?_iq.number:"","صرف المواد");save();return {issue:mi};
 }
 function allMaterialsIssued(quotationId){
   var rows=state.material_issues.filter(function(m){return String(m.quotationId)===String(quotationId);});
@@ -617,13 +709,14 @@ function allMaterialsIssued(quotationId){
 }
 function prepareContract(quotationId,type,fileName,number){
   var q=quoteById(quotationId);if(!q)return {error:"العرض غير موجود."};
+  if(q.status!=="gm_approved"&&q.status!=="financial_approved")return {error:"لا يمكن تجهيز عقد — العرض لم يُعمَّد بعد (حالته «"+quoteStatusLabel(q.status)+"»)."};
   if(CONTRACT_TYPES.indexOf(type)<0)return {error:"اختر نوع العقد."};
   number=String(number||"").trim()||nextSerial("contract","C");
   if(isSerialUsed("contract",number))return {error:"رقم العقد «"+number+"» مستخدم من قبل — أدخل رقماً آخر."};
   var c={id:uid("ct"),number:number,quotationId:q.id,projectId:q.projectId,clientId:q.clientId,type:type,fileName:String(fileName||"").trim(),status:"prepared",preparedBy:state.user?state.user.username:"—",createdAt:nowISO()};
   state.contracts.push(c);
   var p=projectById(q.projectId);if(p&&p.status==="gm_approved"){p.status="contracted";p.updatedAt=nowISO();}
-  save();return {contract:c};
+  logAudit("prepare_contract","تجهيز عقد "+c.type+" رقم "+c.number+" لعرض السعر "+q.number,c.number,"العقود");save();return {contract:c};
 }
 function financialApprove(quotationId){
   var q=quoteById(quotationId);if(!q)return {error:"العرض غير موجود."};
@@ -635,21 +728,21 @@ function financialApprove(quotationId){
   }
   q.status="financial_approved";q.financialApprovedAt=nowISO();q.financialApprovedBy=state.user?state.user.username:"—";q.updatedAt=nowISO();
   var p=projectById(q.projectId);if(p){p.status="approved";p.updatedAt=nowISO();}
-  save();
+  logAudit("financial_approve","الاعتماد المالي لعرض السعر "+q.number+" — تسجيل مديونية "+fmtM(q.total)+" على العميل",q.number,"الاعتماد المالي والمديونيات");save();
   notifyRole("accounts","تم الاعتماد المالي للعرض "+q.number,"سُجلت المديونية على العميل بقيمة "+fmtM(q.total)+".",{quotationId:q.id,projectId:q.projectId});
   return {quotation:q};
 }
-function recordPayment(clientId,kind,amount,note,quotationId){
+function recordPayment(clientId,kind,amount,note,quotationId,skipAudit){
   var cl=clientById(clientId);if(!cl)return {error:"العميل غير موجود."};
   amount=Number(amount)||0;if(amount<=0)return {error:"أدخل مبلغاً أكبر من صفر."};
   if(kind!=="advance"&&kind!=="payment")kind="payment";
   var c=counters();c.payment=(Number(c.payment)||0)+1;
   var pay={id:uid("py"),docNo:"PY-"+String(c.payment).padStart(4,"0"),clientId:cl.id,quotationId:quotationId||null,kind:kind,amount:amount,note:String(note||"").trim(),date:today(),by:state.user?state.user.username:"—",createdAt:nowISO()};
-  state.payments.push(pay);save();return {payment:pay};
+  state.payments.push(pay);if(!skipAudit)logAudit("record_payment","تسجيل "+(kind==="advance"?"دفعة مقدمة":"دفعة سداد")+" "+pay.docNo+" بمبلغ "+fmtM(amount)+" من العميل "+cl.name,pay.docNo,"الاعتماد المالي والمديونيات");save();return {payment:pay};
 }
 function setOpeningBalance(clientId,amount){
   var cl=clientById(clientId);if(!cl)return {error:"العميل غير موجود."};
-  cl.openingBalance=Number(amount)||0;cl.updatedAt=nowISO();save();return {client:cl};
+  cl.openingBalance=Number(amount)||0;cl.updatedAt=nowISO();logAudit("set_opening","تعديل الرصيد الافتتاحي للعميل "+cl.name+" إلى "+fmtM(Number(amount)||0),"","التقارير — ميزان المراجعة");save();return {client:cl};
 }
 /* ---------- مرتجع المواد ---------- */
 function returnsForQuotation(qid){return state.material_returns.filter(function(r){return String(r.quotationId)===String(qid);});}
@@ -672,7 +765,11 @@ function createMaterialReturn(quotationId,itemName,qty,note){
   var price=quoteItemPrice(q,itemName);
   var c=counters();c["return"]=(Number(c["return"])||0)+1;
   var ret={id:uid("mr"),docNo:"MR-"+String(c["return"]).padStart(4,"0"),quotationId:q.id,projectId:q.projectId,clientId:q.clientId,itemName:itemName,qty:qty,unitPrice:price,amount:Math.round(qty*price*100)/100,date:today(),by:state.user?state.user.username:"—",note:String(note||"").trim(),createdAt:nowISO()};
-  state.material_returns.push(ret);save();return {ret:ret};
+  state.material_returns.push(ret);
+  /* المرتجع يعيد الكمية إلى رصيد الصنف في المخزون إن كان مسجلاً. */
+  var _rit=itemByName(itemName);
+  if(_rit){_rit.qty=Number(_rit.qty||0)+qty;_rit.updatedAt=nowISO();}
+  logAudit("create_return","مرتجع مواد "+ret.docNo+": "+itemName+" ×"+qty+" بقيمة "+fmtM(ret.amount)+" — تخفيض مديونية العميل",ret.docNo,"مرتجع المواد");save();return {ret:ret};
 }
 /* ---------- إدارة الحسابات: الإيرادات والمصروفات والحركات ---------- */
 function materialCostTotal(){
@@ -720,11 +817,11 @@ function recordTransaction(kind,amount,category,method,description,clientId){
   var tr={id:uid("tr"),docNo:"TR-"+String(c.transaction).padStart(4,"0"),kind:kind,amount:amount,category:String(category||"").trim()||(kind==="revenue"?"إيراد":"مصروف"),method:method==="بنك"?"بنك":"نقدي",description:String(description||"").trim(),clientId:clientId||null,date:today(),by:state.user?state.user.username:"—",createdAt:nowISO()};
   state.transactions.push(tr);
   if(kind==="revenue"&&clientId){
-    var pr=recordPayment(clientId,"payment",amount,description||"إيراد مسجل من إدارة الحسابات");
+    var pr=recordPayment(clientId,"payment",amount,description||"إيراد مسجل من إدارة الحسابات",null,true);
     if(pr.error){state.transactions.pop();return pr;}
     tr.paymentDocNo=pr.payment.docNo;
   }
-  save();return {transaction:tr};
+  logAudit("record_transaction","تسجيل "+(kind==="revenue"?"إيراد":"مصروف")+" "+tr.docNo+" بمبلغ "+fmtM(amount)+" — "+tr.category,tr.docNo,"إدارة الحسابات");save();return {transaction:tr};
 }
 function accountMovements(){
   var moves=[];
@@ -777,11 +874,20 @@ function saveSetupSettings(fields){
   if(fields.vatRate!==undefined)s.vatRate=Number(fields.vatRate)||15;
   if(fields.bankBalance!==undefined)s.bankBalance=Number(fields.bankBalance)||0;
   if(fields.safeBalance!==undefined)s.safeBalance=Number(fields.safeBalance)||0;
+  if(fields.ownerName!==undefined)s.ownerName=String(fields.ownerName);
+  if(fields.ownerPhone!==undefined)s.ownerPhone=String(fields.ownerPhone);
+  if(fields.taxNumber!==undefined)s.taxNumber=String(fields.taxNumber);
+  if(fields.city!==undefined)s.city=String(fields.city);
+  if(fields.district!==undefined)s.district=String(fields.district);
+  if(fields.street!==undefined)s.street=String(fields.street);
+  if(fields.buildingNo!==undefined)s.buildingNo=String(fields.buildingNo);
+  if(fields.postalCode!==undefined)s.postalCode=String(fields.postalCode);
+  if(fields.subNumber!==undefined)s.subNumber=String(fields.subNumber);
   if(fields.newCode!==undefined&&String(fields.newCode).trim()){
     if(String(fields.newCode).trim().length<4)return {error:"رمز التهيئة يجب أن يكون 4 أرقام على الأقل."};
     s.setupCode=String(fields.newCode).trim();
   }
-  save();return {settings:s};
+  logAudit("save_setup","حفظ تهيئة النظام (بيانات الشركة والأرصدة الافتتاحية"+(fields.newCode?" وتغيير رمز التهيئة":"")+")","","الإعدادات");save();return {settings:s};
 }
 /* ---------- الطباعة والتصدير ---------- */
 function printHtml(html){
@@ -821,8 +927,10 @@ function quotePrintHtml(q){
   var ret=returnsTotalForQuotation(q.id);
   var dense=q.items.length>17;
   var perPage=dense?36:20;
+  var s0=state.settings[0]||{};
   var title='<h1>عرض سعر</h1><h2>رقم '+esc(q.number)+' — التاريخ: '+fmtDate(q.createdAt)+'</h2>'+
-  '<p>العميل: '+esc(cl?cl.name:"")+' — الجوال: <span dir="ltr">'+esc(cl?cl.phone||"":"")+'</span> — المشروع: '+(p?esc(p.number)+" — "+esc(p.title):"")+'</p>';
+  (s0.taxNumber?'<p>الرقم الضريبي: <span dir="ltr">'+esc(s0.taxNumber)+'</span></p>':"")+
+  '<p>العميل: '+esc(cl?cl.name:"")+' — الجوال: <span dir="ltr">'+esc(cl?cl.phone||"":"")+'</span>'+(cl&&cl.taxNumber?' — الرقم الضريبي: <span dir="ltr">'+esc(cl.taxNumber)+'</span>':"")+' — المشروع: '+(p?esc(p.number)+" — "+esc(p.title):"")+'</p>';
   var head='<colgroup><col style="width:5%"><col style="width:50%"><col style="width:10%"><col style="width:10%"><col style="width:12%"><col style="width:13%"></colgroup>'+
   '<tr><th>الرقم</th><th>بيان الأعمال</th><th>الوحدة</th><th>الكمية</th><th>السعر الإفرادي</th><th>السعر الإجمالي</th></tr>';
   var rows=q.items.map(function(it,i){return '<tr><td>'+(i+1)+'</td><td>'+esc(it.name)+'</td><td>'+esc(it.unit||"—")+'</td><td>'+it.qty+'</td><td>'+fmtM(it.price)+'</td><td>'+fmtM(it.qty*it.price)+'</td></tr>';});
@@ -842,15 +950,49 @@ function quotePrintHtml(q){
   return out;
 }
 function printQuotation(qid){var q=quoteById(qid);if(!q)return {error:"العرض غير موجود."};printHtml(quotePrintHtml(q));return {ok:true};}
+/* تطبيع رقم الجوال السعودي لروابط wa.me: حذف غير الأرقام، وتحويل
+   الصفر الأولى إلى 966 للرقم المكوّن من 10 أرقام. */
+function normalizePhone(raw){
+  var phone=String(raw||"").replace(/[^0-9]/g,"");
+  if(phone.length===10&&phone.charAt(0)==="0")phone="966"+phone.slice(1);
+  return phone;
+}
 function waLinkForQuote(qid){
   var q=quoteById(qid);if(!q)return null;
-  var cl=clientById(q.clientId);var phone=String(cl?cl.phone||"":"").replace(/[^0-9]/g,"");
+  var cl=clientById(q.clientId);var phone=normalizePhone(cl?cl.phone||"":"");
   if(!phone)return {error:"رقم جوال العميل غير مسجل."};
-  if(phone.length===10&&phone.charAt(0)==="0")phone="966"+phone.slice(1);
   var p=projectById(q.projectId);
   var items=q.items.map(function(it){return it.name+" ×"+it.qty;}).join("، ");
   var msg="السلام عليكم، عرض السعر رقم "+q.number+" — المشروع: "+(p?p.title:"")+" — المواد: "+items+" — الإجمالي شامل الضريبة: "+fmtM(q.total)+" "+((state.settings[0]||{}).currency||"ر.س");
   return {url:"https://wa.me/"+phone+"?text="+encodeURIComponent(msg),phone:phone};
+}
+/* رابط واتساب الفني المُسند: رسالة جاهزة فيها رقم المشروع وعنوانه،
+   اسم العميل ورقمه، العمل المطلوب، ونوع المشروع. الإرسال نفسه يتم
+   بفتح wa.me من متصفح المدير (ليس إرسالاً تلقائياً من الخادم) —
+   واتساب لا يوفّر إرسالاً من الخادم بلا مزوّد رسمي مدفوع. */
+function buildTechnicianWhatsApp(projectId,technicianId){
+  var p=projectById(projectId);if(!p)return {error:"المشروع غير موجود."};
+  var t=userById(technicianId);if(!t)return {error:"الفني غير موجود."};
+  var phone=normalizePhone(t.phone);
+  if(!phone)return {error:"رقم جوال الفني «"+(t.fullName||t.username)+"» غير مسجل — سجّله من شاشة المستخدمين أولاً."};
+  var cl=clientById(p.clientId);
+  var clPhone=cl&&cl.phone?cl.phone:"—";
+  var msg="السلام عليكم "+(t.fullName||t.username)+"، مهمة جديدة في نظام إدارة مشاريع المقاولات:\n"+
+    "رقم المشروع: "+p.number+"\n"+
+    "عنوان المشروع: "+(p.address||"—")+"\n"+
+    "العميل: "+p.clientName+" — جواله: "+clPhone+"\n"+
+    "العمل المطلوب: "+(p.description||p.title||"—")+"\n"+
+    "نوع المشروع: "+p.type;
+  return {url:"https://wa.me/"+phone+"?text="+encodeURIComponent(msg),phone:phone,technicianId:t.id,projectId:p.id};
+}
+function sendTechnicianWhatsApp(projectId,technicianId){
+  var r=buildTechnicianWhatsApp(projectId,technicianId);
+  if(!r||r.error)return r||{error:"تعذّر بناء رابط الواتساب."};
+  var t=userById(technicianId),p=projectById(projectId);
+  logAudit("assign_whatsapp","إرسال واتساب للفني "+(t?t.fullName||t.username:"")+" — المشروع "+(p?p.number:""),"","إدارة المشاريع");
+  save();
+  if(typeof window!=="undefined"&&window.open){try{window.open(r.url,"_blank");}catch(e){}}
+  return r;
 }
 function sendQuoteWhatsApp(qid){
   var r=waLinkForQuote(qid);
@@ -899,7 +1041,11 @@ function trialPrintHtml(){
 }
 function statementPrintHtml(clientId){
   var st=clientStatement(clientId);if(!st)return "";
-  var title='<h1>كشف حساب العميل التحليلي</h1><h2>'+esc(st.client.name)+' — التاريخ: '+today()+'</h2>';
+  var s0=state.settings[0]||{};
+  var taxLine="";
+  if(s0.taxNumber)taxLine+='<p>الرقم الضريبي للشركة: <span dir="ltr">'+esc(s0.taxNumber)+'</span></p>';
+  if(st.client.taxNumber)taxLine+='<p>الرقم الضريبي للعميل: <span dir="ltr">'+esc(st.client.taxNumber)+'</span></p>';
+  var title='<h1>كشف حساب العميل التحليلي</h1><h2>'+esc(st.client.name)+' — التاريخ: '+today()+'</h2>'+taxLine;
   var head='<colgroup><col style="width:12%"><col style="width:13%"><col style="width:41%"><col style="width:11%"><col style="width:11%"><col style="width:12%"></colgroup><tr><th>التاريخ</th><th>رقم المستند</th><th>البيان</th><th>مدين</th><th>دائن</th><th>الرصيد الجاري</th></tr>';
   var rows=st.moves.map(function(m){return '<tr><td>'+esc(m.date)+'</td><td>'+esc(m.doc)+'</td><td>'+esc(m.desc)+'</td><td>'+(m.debit?fmtM(m.debit):"—")+'</td><td>'+(m.credit?fmtM(m.credit):"—")+'</td><td>'+fmtM(m.balance)+'</td></tr>';});
   var foot='<p><b>الرصيد النهائي: '+fmtM(st.finalBalance)+'</b></p>';
@@ -932,6 +1078,87 @@ function printReceipt(payId){
   printHtml(receiptPrintHtml(pay));return {ok:true};
 }
 function doPrintReceipt(pid){var r=printReceipt(pid);if(r.error)alert(r.error);}
+/* ---------- التقارير الرقابية ---------- */
+function auditFilters(){
+  if(!state.ui.auditFilters)state.ui.auditFilters={user:"",action:"",from:"",to:"",q:""};
+  return state.ui.auditFilters;
+}
+function filterAudit(){
+  var f=auditFilters();
+  var rows=(state.audit_log||[]).slice().sort(function(a,b){return String(b.at||"").localeCompare(String(a.at||""));});
+  return rows.filter(function(e){
+    if(f.user&&String(e.username)!==String(f.user))return false;
+    if(f.action&&e.action!==f.action)return false;
+    if(f.from&&String(e.at||"").slice(0,10)<f.from)return false;
+    if(f.to&&String(e.at||"").slice(0,10)>f.to)return false;
+    if(f.q){var s=(e.summary||"")+" "+(e.docNo||"")+" "+(e.username||"")+" "+(e.fullName||"")+" "+auditActionLabel(e.action);if(s.indexOf(f.q)<0)return false;}
+    return true;
+  });
+}
+function applyAuditFilters(){
+  var f=auditFilters();
+  f.user=$("afUser")?$("afUser").value:"";
+  f.action=$("afAction")?$("afAction").value:"";
+  f.from=$("afFrom")?$("afFrom").value:"";
+  f.to=$("afTo")?$("afTo").value:"";
+  f.q=$("afQ")?$("afQ").value.trim():"";
+  render();
+}
+function clearAuditFilters(){state.ui.auditFilters={user:"",action:"",from:"",to:"",q:""};render();}
+function auditUsers(){
+  var seen={};var out=[];
+  (state.audit_log||[]).forEach(function(e){var k=String(e.username||"");if(k&&!seen[k]){seen[k]=1;out.push({username:k,fullName:e.fullName||k});}});
+  return out;
+}
+function buildAuditCSV(){
+  var rows=filterAudit();
+  var out=[["التقارير الرقابية — سجل العمليات"],["التاريخ والوقت","المستخدم","الاسم","الدور","العملية","الشاشة","رقم المستند","التفاصيل"]];
+  rows.forEach(function(e){out.push([fmtDateTime(e.at),e.username,e.fullName,auditRoleLabel(e.role),auditActionLabel(e.action),e.screen||"",e.docNo||"",e.summary||""]);});
+  return "\uFEFF"+out.map(function(r){return r.map(function(c){return '"'+String(c==null?"":c).replace(/"/g,'""')+'"';}).join(",");}).join("\r\n");
+}
+function exportAuditExcel(){downloadTextFile("audit-log.csv",buildAuditCSV(),"text/csv;charset=utf-8");return true;}
+function auditPrintHtml(){
+  var rows=filterAudit();
+  var title='<h1>التقارير الرقابية</h1><h2>سجل العمليات — التاريخ: '+today()+' — عدد العمليات: '+rows.length+'</h2>';
+  var head='<colgroup><col style="width:17%"><col style="width:12%"><col style="width:18%"><col style="width:11%"><col style="width:42%"></colgroup><tr><th>التاريخ والوقت</th><th>المستخدم</th><th>العملية</th><th>رقم المستند</th><th>التفاصيل</th></tr>';
+  var rs=rows.map(function(e){return '<tr><td>'+fmtDateTime(e.at)+'</td><td>'+esc(e.username)+' ('+esc(auditRoleLabel(e.role))+')</td><td>'+esc(auditActionLabel(e.action))+'</td><td>'+esc(e.docNo||"—")+'</td><td>'+esc(e.summary||"")+'</td></tr>';});
+  var pages=paginateRows(rs,24,0);
+  var out="";
+  pages.forEach(function(pr,i){
+    var inner=(i===0?title:"")+'<table>'+head+pr.join("")+'</table>';
+    out+=letterheadPage(inner,i+1,pages.length,"تابع التقارير الرقابية");
+  });
+  return out;
+}
+function printAuditReport(){logAudit("print_report","طباعة/تصدير PDF للتقارير الرقابية — "+filterAudit().length+" عملية معروضة","","التقارير الرقابية");save();printHtml(auditPrintHtml());return true;}
+function screenAudit(){
+  var f=auditFilters();
+  var rows=filterAudit();
+  var h='<div class="card"><h2>التقارير الرقابية</h2>'+
+  '<p class="muted">كل العمليات التي تمت في النظام من أي مستخدم، بالتاريخ والوقت — من تسجيل الدخول إلى الخروج. السجل محمي: لا يمكن حذف سجلاته من الواجهة، ولا يُشمل في النسخة الاحتياطية، ولا يُستبدل عند استرجاع نسخة، ولا يُمسح عند تصفير البيانات إلا بطلب صريح من المستخدم.</p>'+
+  '<div class="form-grid">'+
+  '<div><label>المستخدم</label><select id="afUser" class="inp"><option value="">— كل المستخدمين —</option>'+auditUsers().map(function(u){return '<option value="'+esc(u.username)+'"'+(f.user===u.username?" selected":"")+'>'+esc(u.fullName)+' ('+esc(u.username)+')</option>';}).join("")+'</select></div>'+
+  '<div><label>نوع العملية</label><select id="afAction" class="inp"><option value="">— كل العمليات —</option>'+Object.keys(AUDIT_ACTIONS).map(function(k){return '<option value="'+k+'"'+(f.action===k?" selected":"")+'>'+esc(AUDIT_ACTIONS[k])+'</option>';}).join("")+'</select></div>'+
+  '<div><label>من تاريخ</label><input id="afFrom" type="date" class="inp" value="'+esc(f.from)+'"></div>'+
+  '<div><label>إلى تاريخ</label><input id="afTo" type="date" class="inp" value="'+esc(f.to)+'"></div>'+
+  '<div><label>بحث نصي</label><input id="afQ" class="inp" placeholder="ابحث في التفاصيل أو المستند أو المستخدم" value="'+esc(f.q)+'"></div></div>'+
+  '<div class="row" style="margin-top:.6rem"><button type="button" class="btn btn-navy btn-sm" onclick="applyAuditFilters()">تطبيق الفلاتر</button>'+
+  '<button type="button" class="btn btn-ghost btn-sm" onclick="clearAuditFilters()">مسح الفلاتر</button>'+
+  '<button type="button" class="btn btn-gold btn-sm" onclick="exportAuditExcel()">تصدير Excel</button>'+
+  '<button type="button" class="btn btn-navy btn-sm" onclick="printAuditReport()">تصدير PDF (طباعة)</button></div>'+
+  '<p class="muted">تصدير PDF يتم عبر نافذة الطباعة — اختر «حفظ كـ PDF» من متصفحك.</p>'+
+  '<p><b>عدد العمليات المعروضة: <span class="num">'+rows.length+'</span></b> من أصل <span class="num">'+((state.audit_log||[]).length)+'</span></p>';
+  if(!rows.length)h+='<p class="muted">لا توجد عمليات مطابقة للفلاتر.</p>';
+  else{
+    h+='<table><tr><th>التاريخ والوقت</th><th>المستخدم</th><th>العملية</th><th>الشاشة</th><th>رقم المستند</th><th>التفاصيل</th></tr>';
+    rows.forEach(function(e){
+      h+='<tr><td class="num">'+fmtDateTime(e.at)+'</td><td>'+esc(e.fullName)+' ('+esc(e.username)+')</td><td>'+esc(auditActionLabel(e.action))+'</td><td>'+esc(e.screen||"—")+'</td><td class="num">'+esc(e.docNo||"—")+'</td><td>'+esc(e.summary||"")+'</td></tr>';
+    });
+    h+='</table>';
+  }
+  return h+'</div>';
+}
+
 /* ميزان مراجعة بحسابات العملاء: افتتاحي + مدين (مديونيات معتمدة) + دائن
    (دفعات) + ختامي لكل عميل، مع صف إجمالي كلي. */
 function trialBalance(){
@@ -974,15 +1201,105 @@ function deleteProject(projectId){
   var p=projectById(projectId);if(!p)return {error:"المشروع غير موجود."};
   if(projectHasWork(projectId))return {error:"لا يمكن حذف المشروع "+p.number+" — تم العمل عليه (إسناد أو معاينة أو عرض سعر)."};
   state.projects=state.projects.filter(function(x){return String(x.id)!==String(projectId);});
-  save();return {ok:true};
+  logAudit("delete_project","حذف المشروع "+p.number+" ("+p.title+")",p.number,"إدارة المشاريع");save();return {ok:true};
 }
-function createUser(username,password,fullName,role){
+/* ---------- الأصناف ---------- */
+/* سجل الصنف: {id, code, name, unit, salePrice, costPrice, qty, createdAt, updatedAt}.
+   الكود تلقائي متسلسل ITM-0001 ولا يتكرر أبداً (nextSerial + فحص isSerialUsed).
+   qty هو رصيد المخزون الحالي: يُخصم عند صرف المواد ويُعاد عند المرتجع. */
+function itemById(id){for(var i=0;i<state.items.length;i++)if(String(state.items[i].id)===String(id))return state.items[i];return null;}
+function itemByCode(code){code=String(code||"").trim();if(!code)return null;for(var i=0;i<state.items.length;i++)if(String(state.items[i].code)===String(code))return state.items[i];return null;}
+function itemByName(name){name=String(name||"").trim();if(!name)return null;for(var i=0;i<state.items.length;i++)if(String(state.items[i].name).trim()===name)return state.items[i];return null;}
+function searchItems(q){
+  q=String(q||"").trim();
+  if(!q)return state.items.slice();
+  return state.items.filter(function(it){return String(it.name||"").indexOf(q)>=0||String(it.code||"").indexOf(q)>=0;});
+}
+/* هل على الصنف أي حركة؟ الاسم في أي بند عرض سعر، أو في صرف مواد، أو في مرتجع مواد.
+   الحركة تمنع الحذف نهائياً (حماية مثل حماية حذف المشروع) ويبقى التعديل مسموحاً. */
+function itemHasMovements(item){
+  var name=String(item.name||"").trim();
+  if(!name)return false;
+  for(var i=0;i<state.quotations.length;i++){var q=state.quotations[i];for(var j=0;j<(q.items||[]).length;j++)if(String(q.items[j].name).trim()===name)return true;}
+  for(var k=0;k<state.material_issues.length;k++)if(String(state.material_issues[k].itemName).trim()===name)return true;
+  for(var m=0;m<state.material_returns.length;m++)if(String(state.material_returns[m].itemName).trim()===name)return true;
+  return false;
+}
+function createItem(code,name,unit,salePrice,costPrice,qty){
+  name=String(name||"").trim();if(!name)return {error:"اسم الصنف مطلوب."};
+  code=String(code||"").trim()||nextSerial("item","ITM");
+  if(itemByCode(code))return {error:"كود الصنف «"+code+"» مستخدم من قبل — أدخل كوداً آخر."};
+  var it={id:uid("it"),code:code,name:name,unit:String(unit||"").trim(),salePrice:Number(salePrice)||0,costPrice:Number(costPrice)||0,qty:Number(qty)||0,createdAt:nowISO(),updatedAt:nowISO()};
+  state.items.push(it);logAudit("create_item","إنشاء صنف جديد: "+it.code+" — "+it.name+" (سعر البيع "+fmtM(it.salePrice)+" — الكمية "+it.qty+")",it.code,"الأصناف");save();return {item:it};
+}
+function updateItem(itemId,fields){
+  var it=itemById(itemId);if(!it)return {error:"الصنف غير موجود."};
+  if(fields.name!==undefined&&String(fields.name).trim())it.name=String(fields.name).trim();
+  if(fields.code!==undefined){var nc=String(fields.code).trim();if(nc&&nc!==it.code&&itemByCode(nc))return {error:"كود الصنف «"+nc+"» مستخدم من قبل."};if(nc)it.code=nc;}
+  if(fields.unit!==undefined)it.unit=String(fields.unit||"").trim();
+  if(fields.salePrice!==undefined)it.salePrice=Number(fields.salePrice)||0;
+  if(fields.costPrice!==undefined)it.costPrice=Number(fields.costPrice)||0;
+  if(fields.qty!==undefined)it.qty=Number(fields.qty)||0;
+  it.updatedAt=nowISO();
+  logAudit("update_item","تعديل الصنف "+it.code+" — "+it.name,it.code,"الأصناف");save();return {item:it};
+}
+function deleteItem(itemId){
+  var it=itemById(itemId);if(!it)return {error:"الصنف غير موجود."};
+  if(itemHasMovements(it))return {error:"لا يمكن حذف الصنف «"+it.name+"» — توجد عليه حركات (بنود عروض أسعار أو صرف/مرتجع مواد). التعديل مسموح أما الحذف فممنوع."};
+  state.items=state.items.filter(function(x){return String(x.id)!==String(itemId);});
+  logAudit("delete_item","حذف الصنف "+it.code+" — "+it.name,it.code,"الأصناف");save();return {ok:true};
+}
+/* ---------- الأصناف — استيراد وتصدير CSV (Excel) ---------- */
+function parseCSVLine(line){
+  var out=[],cur="",inq=false;
+  for(var i=0;i<line.length;i++){var ch=line[i];
+    if(inq){if(ch==='"'){if(line[i+1]==='"'){cur+='"';i++;}else inq=false;}else cur+=ch;}
+    else if(ch==='"')inq=true;
+    else if(ch===','){out.push(cur);cur="";}
+    else cur+=ch;}
+  out.push(cur);return out;
+}
+function toCSV(rows){
+  return "\uFEFF"+rows.map(function(r){return r.map(function(c){return '"'+String(c==null?"":c).replace(/"/g,'""')+'"';}).join(",");}).join("\r\n");
+}
+function importItemsCSV(text){
+  var t=String(text||"").replace(/^\uFEFF/,"").replace(/\r\n/g,"\n").replace(/\r/g,"\n");
+  var lines=t.split("\n");
+  var imported=0,duplicated=0,rejected=0;
+  lines.forEach(function(line){
+    if(!String(line).trim())return;
+    var cells=parseCSVLine(line);
+    var code=String(cells[0]||"").trim();
+    var name=String(cells[1]||"").trim();
+    if(!code&&!name)return;
+    var lc0=code.toLowerCase(),lc1=name.toLowerCase();
+    if(lc0==="الكود"||lc0==="code"||lc1==="الاسم"||lc1==="name")return; /* صف الترويسة */
+    if(!name){rejected++;return;}
+    if(code&&itemByCode(code)){duplicated++;return;}
+    var r=createItem(code,name,String(cells[2]||"").trim(),cells[3],cells[4],cells[5]);
+    if(r.error){if(r.error.indexOf("مستخدم من قبل")>=0)duplicated++;else rejected++;}
+    else imported++;
+  });
+  logAudit("import_items","استيراد أصناف من ملف Excel (CSV): مستورد "+imported+" — مكرر "+duplicated+" — مرفوض "+rejected,"","الأصناف");
+  save();
+  return {imported:imported,duplicated:duplicated,rejected:rejected};
+}
+function buildItemsCSV(){
+  var rows=[["الأصناف"],["الكود","الاسم","الوحدة","سعر البيع","سعر التكلفة","الكمية"]];
+  state.items.forEach(function(it){rows.push([it.code,it.name,it.unit||"",Number(it.salePrice||0).toFixed(2),Number(it.costPrice||0).toFixed(2),String(it.qty||0)]);});
+  return toCSV(rows);
+}
+function exportItemsCSV(){
+  downloadTextFile("items.csv",buildItemsCSV(),"text/csv;charset=utf-8");
+  logAudit("export_items","تصدير الأصناف إلى ملف Excel (CSV) — "+state.items.length+" صنفاً","","الأصناف");save();return true;
+}
+function createUser(username,password,fullName,role,phone,permissions){
   username=String(username||"").trim();password=String(password||"");
   if(!username||!password)return {error:"اسم المستخدم وكلمة المرور مطلوبان."};
   if(!ROLES[role])return {error:"اختر دوراً صحيحاً."};
   if(findLocalUser(username))return {error:"اسم المستخدم «"+username+"» موجود من قبل."};
-  var u={id:uid("u"),username:username,password:password,fullName:String(fullName||"").trim()||username,role:role,companyId:COMPANY_ID,active:true,createdAt:nowISO()};
-  state.users.push(u);save();return {user:u};
+  var u={id:uid("u"),username:username,password:password,fullName:String(fullName||"").trim()||username,role:role,phone:String(phone||"").trim(),permissions:Array.isArray(permissions)?permissions.slice():(ROLE_SCREENS[role]||[]).slice(),companyId:COMPANY_ID,active:true,createdAt:nowISO()};
+  state.users.push(u);logAudit("create_user","إنشاء مستخدم جديد: "+u.username+" ("+u.fullName+") — الدور: "+roleName(u.role),u.username,"المستخدمون");save();return {user:u};
 }
 function updateUser(userId,fields){
   var u=userById(userId);if(!u)return {error:"المستخدم غير موجود."};
@@ -992,14 +1309,22 @@ function updateUser(userId,fields){
   if(fields.role&&ROLES[fields.role])u.role=fields.role;
   if(fields.password)u.password=String(fields.password);
   if(fields.active!==undefined)u.active=!!fields.active;
-  save();return {user:u};
+  if(fields.phone!==undefined)u.phone=String(fields.phone||"").trim();
+  if(fields.permissions!==undefined){
+    if(Array.isArray(fields.permissions)){
+      var oldPerms=Array.isArray(u.permissions)?u.permissions.slice():null;
+      u.permissions=fields.permissions.slice();
+      if(JSON.stringify(oldPerms)!==JSON.stringify(u.permissions))logAudit("update_permissions","تغيير صلاحيات المستخدم "+u.username+" — الشاشات المسموحة الآن: "+u.permissions.map(function(s){return SCREEN_TITLES[s]||s;}).join("، "),u.username,"المستخدمون");
+    }else if(fields.permissions===null)u.permissions=null;
+  }
+  logAudit("update_user","تعديل المستخدم "+u.username+" ("+u.fullName+")",u.username,"المستخدمون");save();return {user:u};
 }
 function deleteUser(userId){
   var u=userById(userId);if(!u)return {error:"المستخدم غير موجود."};
   if(u.username==="1")return {error:"لا يمكن حذف المدير العام."};
   if(state.assignments.some(function(a){return String(a.technicianId)===String(userId);}))return {error:"لا يمكن حذف هذا المستخدم — لديه مهام مسندة."};
   state.users=state.users.filter(function(x){return String(x.id)!==String(userId);});
-  save();return {ok:true};
+  logAudit("delete_user","حذف المستخدم "+u.username+" ("+u.fullName+")",u.username,"المستخدمون");save();return {ok:true};
 }
 </script>
 <script>
@@ -1027,7 +1352,7 @@ function renderLogin(){
   var u=$("loginUser");if(u)try{u.focus();}catch(e){}
 }
 function navHtml(){
-  var screens=["dashboard","projects","tasks","quotations","approvals","materials","returns","contracts","financial","accounts","reports","users","employees","notifications","settings"];
+  var screens=["dashboard","projects","tasks","quotations","approvals","materials","returns","contracts","financial","accounts","reports","items","audit","users","employees","notifications","settings"];
   var h="";
   screens.forEach(function(s){if(canSee(s))h+='<button type="button" class="'+(state.screen===s?"on":"")+'" onclick="goScreen(\''+s+'\')">'+esc(SCREEN_TITLES[s])+'</button>';});
   return '<nav class="tabs">'+h+'</nav>';
@@ -1035,6 +1360,12 @@ function navHtml(){
 function goScreen(s){if(!canSee(s))return;state.screen=s;state.ui.statementClientId=null;render();}
 function renderApp(){
   var u=state.user;
+  /* حارس الصلاحيات: إن كانت الشاشة الحالية غير مسموحة للمستخدم
+     (مثلاً بعد تقييد صلاحياته وهو داخلها)، يُنقل لأول شاشة مسموحة له. */
+  if(!canSee(state.screen)){
+    var allowed=userScreens(u);
+    state.screen=allowed.length?allowed[0]:"dashboard";
+  }
   var unread=myNotifications().filter(function(n){return !n.read;}).length;
   $("app").innerHTML=
   '<header><div class="brand">نظام إدارة مشاريع المقاولات <span>| '+esc(companyInfo().companyName)+'</span></div>'+
@@ -1054,6 +1385,8 @@ function renderApp(){
   else if(state.screen==="financial")m.innerHTML=screenFinancial();
   else if(state.screen==="accounts")m.innerHTML=screenAccounts();
   else if(state.screen==="reports")m.innerHTML=screenReports();
+  else if(state.screen==="items")m.innerHTML=screenItems();
+  else if(state.screen==="audit")m.innerHTML=screenAudit();
   else if(state.screen==="users")m.innerHTML=screenUsers();
   else if(state.screen==="employees")m.innerHTML=screenEmployees();
   else if(state.screen==="notifications")m.innerHTML=screenNotifications();
@@ -1116,6 +1449,7 @@ function screenProjects(){
   h+='<h3>1) تسجيل عميل جديد</h3><div class="form-grid">'+
   '<div><label>اسم العميل *</label><input id="ncName" class="inp" placeholder="اسم العميل"></div>'+
   '<div><label>رقم الجوال</label><input id="ncPhone" class="inp" placeholder="05xxxxxxxx"></div>'+
+  '<div><label>الرقم الضريبي (اختياري)</label><input id="ncTax" class="inp num" placeholder="الرقم الضريبي للعميل"></div>'+
   '<div><label>العنوان</label><input id="ncAddr" class="inp" placeholder="الحي / الشارع / المدينة"></div>'+
   '<div><label>رصيد افتتاحي (اختياري)</label><input id="ncOpen" type="number" step="0.01" class="inp" value="0"></div>'+
   '</div><div class="row" style="margin-top:.6rem"><button type="button" class="btn btn-gold" onclick="doAddClient()">حفظ العميل</button></div>';
@@ -1152,8 +1486,27 @@ function doAssign(pid){
   var ids=[];document.querySelectorAll(".asTech:checked").forEach(function(c){ids.push(c.value);});
   var r=assignTechnicians(pid,ids);
   var m=$("projMsg");if(r.error){if(m){m.innerHTML='<div class="err">'+esc(r.error)+'</div>';}alert(r.error);return;}
-  render();var m2=$("projMsg");if(m2)m2.innerHTML='<div class="okbox">تم إسناد '+r.assigned.length+' فني/فنيين وأُرسل الإشعار لكل منهم.</div>';
+  render();
+  var m2=$("projMsg");
+  if(m2){
+    var h='<div class="okbox">تم إسناد '+r.assigned.length+' فني/فنيين وأُرسل الإشعار لكل منهم داخل النظام.</div>';
+    h+='<div class="card" style="border:2px solid var(--green)"><h3>📱 إرسال واتساب للفنيين</h3><p class="muted">اضغط الزر لكل فني لفتح واتساب برسالة جاهزة فيها: رقم المشروع وعنوانه، اسم العميل ورقمه، العمل المطلوب، ونوع المشروع. الإرسال يتم من متصفحك عبر wa.me وليس تلقائياً من الخادم.</p>';
+    r.assigned.forEach(function(a){
+      var w=buildTechnicianWhatsApp(pid,a.technicianId);
+      if(w.error)h+='<p class="err">'+esc(w.error)+'</p>';
+      else h+='<div class="row" style="margin:.4rem 0"><button type="button" class="btn btn-green" onclick="doWaTechnician(\''+pid+'\',\''+a.technicianId+'\')">📱 إرسال واتساب للفني '+esc(a.technicianName)+'</button></div>';
+    });
+    h+='</div>';
+    m2.innerHTML=h;
+  }
+  /* فتح تلقائي بسؤال المدير أولاً — عند فني واحد فقط (مع أكثر من فني
+     الأزرار أعلاه تكفي حتى لا تُفتح نوافذ كثيرة دفعة واحدة). */
+  if(r.assigned.length===1&&typeof confirm==="function"){
+    var w0=buildTechnicianWhatsApp(pid,r.assigned[0].technicianId);
+    if(!w0.error&&confirm("تم الإسناد. هل تريد فتح واتساب للفني "+r.assigned[0].technicianName+" الآن لإرسال تفاصيل المهمة؟"))sendTechnicianWhatsApp(pid,r.assigned[0].technicianId);
+  }
 }
+function doWaTechnician(pid,tid){var r=sendTechnicianWhatsApp(pid,tid);if(r&&r.error)alert(r.error);}
 function showInspect(pid){
   var p=projectById(pid);if(!p)return;
   var media=state.media.filter(function(m){return String(m.projectId)===String(pid);});
@@ -1191,9 +1544,9 @@ function showProject(pid){
   '<h3>عروض الأسعار</h3>'+(qs.length?qs.map(function(q){return '<p>• '+esc(q.number)+' — '+statusBadge(q.status,"quote")+(canPrice()?' — <span class="num">'+fmtM(q.total)+'</span>':"")+'</p>';}).join(""):'<p class="muted">لا توجد عروض بعد.</p>')+'</div>';
   var b=$("projectBox");if(b)b.innerHTML=h;
 }
-function delProject(pid){var r=deleteProject(pid);if(r.error){alert(r.error);return;}render();}
+function delProject(pid){var p=projectById(pid);if(p&&typeof confirm==="function"&&!confirm("هل تريد حذف المشروع "+p.number+"؟"))return;var r=deleteProject(pid);if(r.error){alert(r.error);return;}render();}
 function doAddClient(){
-  var r=addClient($("ncName").value,$("ncPhone").value,$("ncAddr").value,$("ncOpen").value);
+  var r=addClient($("ncName").value,$("ncPhone").value,$("ncAddr").value,$("ncOpen").value,$("ncTax")?$("ncTax").value:"");
   var m=$("projMsg");
   if(r.error){if(m)m.innerHTML='<div class="err">'+esc(r.error)+'</div>';return;}
   render();var m2=$("projMsg");if(m2)m2.innerHTML='<div class="okbox">تم حفظ العميل «'+esc(r.client.name)+'» — اختره الآن من قائمة العملاء لتسجيل المشروع.</div>';
@@ -1265,20 +1618,96 @@ function handleMediaFile(pid,input,kind){
   rd.onerror=function(){alert("تعذّرت قراءة الصورة.");};
   rd.readAsDataURL(f);
 }
+/* ---------- نافذة اختيار الأصناف (F9) والإكمال التلقائي ----------
+   تُستخدم في شاشة الأصناف وفي حقل اسم الصنف ببنود عروض الأسعار.
+   target: {kind:"form"} لنموذج الأصناف، أو {kind:"quote",line:i} لبند عرض.
+   النافذة تُبنى في DOM مباشرة دون render() حتى لا تضيع القيم المكتوبة. */
+function itemPickRowHtml(it){
+  return '<div class="item-pick-row" data-item-id="'+esc(it.id)+'"><b>'+esc(it.code)+'</b> — '+esc(it.name)+' <span class="muted">('+(esc(it.unit||"—"))+' — المتاح: '+it.qty+' — سعر البيع: '+fmtM(it.salePrice)+')</span></div>';
+}
+function bindItemPickRows(container,target){
+  if(!container)return;
+  container.querySelectorAll(".item-pick-row").forEach(function(row){
+    row.addEventListener("click",function(){var it=itemById(row.getAttribute("data-item-id"));pickItem(it,target);});
+  });
+}
+function closeItemPicker(){var m=$("itemPickerModal");if(m)m.remove();}
+function closeItemSuggest(){var d=$("itemPickerDrop");if(d)d.remove();}
+function openItemPicker(target){
+  closeItemPicker();closeItemSuggest();
+  var overlay=document.createElement("div");
+  overlay.id="itemPickerModal";
+  overlay.className="item-modal";
+  var rows=state.items.map(function(it){return itemPickRowHtml(it);}).join("");
+  overlay.innerHTML='<div class="item-modal-card"><h3>اختر صنفاً</h3>'+
+    '<input id="itemPickerSearch" class="inp" placeholder="ابحث بالاسم أو الكود…" oninput="itemPickerSearchInput(this)">'+
+    '<div id="itemPickerList" style="max-height:300px;overflow:auto;margin-top:.5rem">'+(rows||'<p class="muted">لا توجد أصناف مسجلة بعد — سجّلها من شاشة الأصناف.</p>')+'</div>'+
+    '<div class="row" style="margin-top:.6rem"><button type="button" class="btn btn-ghost" onclick="closeItemPicker()">إغلاق (Esc)</button></div></div>';
+  document.body.appendChild(overlay);
+  state.ui.itemPickerTarget=target;
+  bindItemPickRows(overlay,target);
+  var s=$("itemPickerSearch");if(s)try{s.focus();}catch(e){}
+}
+function itemPickerSearchInput(el){
+  var list=$("itemPickerList");if(!list)return;
+  var rows=searchItems(el.value).map(function(it){return itemPickRowHtml(it);}).join("");
+  list.innerHTML=rows||'<p class="muted">لا توجد أصناف مطابقة.</p>';
+  bindItemPickRows(list,state.ui.itemPickerTarget);
+}
+function pickItem(it,target){
+  if(!it)return;
+  closeItemPicker();closeItemSuggest();
+  if(target&&target.kind==="quote"){
+    var ls=qLines();var l=ls[target.line];if(!l)return;
+    l.name=it.name;l.price=it.salePrice;l.unit=it.unit||"";l.itemId=it.id;l.availQty=it.qty;
+    render();
+  }else if(target&&target.kind==="form"){
+    /* اختيار صنف في نموذج الأصناف يفتح وضع تعديله ببياناته كاملة. */
+    state.ui.editItemId=it.id;
+    render();
+  }else if(target&&target.el){
+    target.el.value=it.name;
+  }
+}
+function itemPickerKey(e,inputEl,target){
+  if(e&&e.key==="F9"){e.preventDefault();openItemPicker(target);return;}
+  if(e&&e.key==="Escape"){closeItemPicker();closeItemSuggest();}
+}
+function itemPickerInput(inputEl,target){
+  closeItemSuggest();
+  var q=String(inputEl.value||"").trim();
+  if(q.length<1)return;
+  var matches=searchItems(q).slice(0,8);
+  if(!matches.length)return;
+  var d=document.createElement("div");
+  d.id="itemPickerDrop";d.className="item-suggest";
+  d.innerHTML=matches.map(function(it){return itemPickRowHtml(it);}).join("");
+  if(inputEl.parentElement)inputEl.parentElement.appendChild(d);else document.body.appendChild(d);
+  bindItemPickRows(d,target);
+}
 /* ---------- عروض الأسعار ---------- */
 function qLineRow(i,l){
-  return '<tr><td><input class="inp" data-ql="'+i+'" data-qf="name" value="'+esc(l.name||"")+'" placeholder="اسم الصنف / المادة" onchange="qLineChange('+i+',\'name\',this.value)"></td>'+
+  var avail=(l.itemId&&l.availQty!==undefined)?'<div class="muted">الوحدة: '+esc(l.unit||"—")+' — المتاح: '+l.availQty+'</div>':(l.unit?'<div class="muted">الوحدة: '+esc(l.unit)+'</div>':"");
+  return '<tr><td><input class="inp" data-ql="'+i+'" data-qf="name" value="'+esc(l.name||"")+'" placeholder="اسم الصنف / المادة — F9 للاختيار من الأصناف" onchange="qLineChange('+i+',\'name\',this.value)" onkeydown="itemPickerKey(event,this,{kind:\'quote\',line:'+i+'})" oninput="itemPickerInput(this,{kind:\'quote\',line:'+i+'})">'+avail+'</td>'+
   '<td><input class="inp num" type="number" min="0" step="0.01" data-ql="'+i+'" data-qf="qty" value="'+esc(l.qty||"")+'" onchange="qLineChange('+i+',\'qty\',this.value)"></td>'+
   '<td><input class="inp num" type="number" min="0" step="0.01" data-ql="'+i+'" data-qf="price" value="'+esc(l.price||"")+'" onchange="qLineChange('+i+',\'price\',this.value)"></td>'+
   '<td class="num">'+fmtM((Number(l.qty)||0)*(Number(l.price)||0))+'</td></tr>';
 }
 function qLines(){if(!state.ui.qLines)state.ui.qLines=[{name:"",qty:1,price:""},{name:"",qty:1,price:""}];return state.ui.qLines;}
-function qLineChange(i,f,v){var ls=qLines();if(!ls[i])return;if(f==="name")ls[i].name=v;else ls[i][f]=v;render();}
+function qLineChange(i,f,v){var ls=qLines();if(!ls[i])return;if(f==="name"){ls[i].name=v;ls[i].itemId=null;ls[i].unit="";ls[i].availQty=undefined;}else ls[i][f]=v;render();}
+/* حالة عقد الصيانة في نموذج العرض: تُحفظ في state.ui.qMaint فور
+   تغييرها، فتبقى بعد كل إعادة رسم (إضافة بند، كتابة اسم صنف...).
+   العطل السابق: الزر كان onchange="render()" بلا حفظ — كل إعادة رسم
+   كانت تعيد بناء النموذج والزر غير مفعّل وتضيع القيم المكتوبة. */
+function qMaintState(){if(!state.ui.qMaint)state.ui.qMaint={included:false,type:CONTRACT_TYPES[0],amount:0,duration:""};return state.ui.qMaint;}
+function qMaintToggle(on){var qm=qMaintState();qm.included=!!on;render();}
+function qMaintField(f,v){var qm=qMaintState();if(f==="amount")qm.amount=Number(v)||0;else qm[f]=v;}
 function qAddLine(){qLines().push({name:"",qty:1,price:""});render();}
 function screenQuotations(){
   var inspected=state.projects.filter(function(p){return p.status==="inspected"||p.status==="quoted"||p.status==="client_accepted"||p.status==="gm_approved"||p.status==="approved";});
   var lines=qLines();
-  var t=quoteTotals(lines,0);
+  var qm=qMaintState();
+  var t=quoteTotals(lines,qm.included?qm.amount:0);
   var h='<div class="card"><h2>عروض الأسعار</h2><div id="qMsg"></div>';
   h+='<h3>عرض سعر جديد</h3><div class="form-grid">'+
   '<div><label>المشروع (بعد قبول المعاينة) *</label><select id="qProject" class="inp"><option value="">— اختر المشروع —</option>'+inspected.map(function(p){return '<option value="'+esc(p.id)+'">'+esc(p.number)+' — '+esc(p.clientName)+' — '+esc(p.type)+'</option>';}).join("")+'</select></div>'+
@@ -1286,12 +1715,12 @@ function screenQuotations(){
   '<h3>بنود المواد</h3><table><tr><th>الصنف / المادة</th><th>الكمية</th><th>سعر الوحدة</th><th>الإجمالي</th></tr>'+
   lines.map(function(l,i){return qLineRow(i,l);}).join("")+
   '</table><div class="row" style="margin-top:.5rem"><button type="button" class="btn btn-ghost btn-sm" onclick="qAddLine()">+ إضافة بند</button>'+
-  '<span class="muted">المجموع الفرعي: <b class="num">'+fmtM(t.subtotal)+'</b> — ضريبة 15%: <b class="num">'+fmtM(t.subtotal*0.15)+'</b></span></div>'+
+  '<span class="muted">المجموع الفرعي: <b class="num">'+fmtM(t.subtotal)+'</b>'+(qm.included?' — عقد الصيانة: <b class="num">'+fmtM(qm.amount)+'</b>':"")+' — ضريبة 15%: <b class="num">'+fmtM(t.vat)+'</b> — الإجمالي: <b class="num">'+fmtM(t.total)+'</b></span></div>'+
   '<h3>عقد صيانة اختياري</h3><div class="form-grid">'+
-  '<div><label><input type="checkbox" id="qMaint" onchange="render()"> يشمل عقد صيانة</label></div>'+
-  '<div><label>نوع العقد</label><select id="qMaintType" class="inp">'+CONTRACT_TYPES.map(function(x){return '<option>'+esc(x)+'</option>';}).join("")+'</select></div>'+
-  '<div><label>قيمة عقد الصيانة</label><input id="qMaintAmt" type="number" min="0" step="0.01" class="inp" value="0"></div>'+
-  '<div><label>مدة العقد</label><input id="qMaintDur" class="inp" placeholder="مثال: سنة واحدة — زيارة كل 3 أشهر"></div></div>'+
+  '<div><label><input type="checkbox" id="qMaint"'+(qm.included?" checked":"")+' onchange="qMaintToggle(this.checked)"> يشمل عقد صيانة</label></div>'+
+  '<div><label>نوع العقد</label><select id="qMaintType" class="inp"'+(qm.included?"":" disabled")+' onchange="qMaintField(\'type\',this.value)">'+CONTRACT_TYPES.map(function(x){return '<option'+(qm.type===x?" selected":"")+'>'+esc(x)+'</option>';}).join("")+'</select></div>'+
+  '<div><label>قيمة عقد الصيانة</label><input id="qMaintAmt" type="number" min="0" step="0.01" class="inp" value="'+esc(qm.amount)+'"'+(qm.included?"":" disabled")+' oninput="qMaintField(\'amount\',this.value)"></div>'+
+  '<div><label>مدة العقد</label><input id="qMaintDur" class="inp" placeholder="مثال: سنة واحدة — زيارة كل 3 أشهر" value="'+esc(qm.duration)+'"'+(qm.included?"":" disabled")+' oninput="qMaintField(\'duration\',this.value)"></div></div>'+
   '<div class="row" style="margin-top:.6rem"><button type="button" class="btn btn-navy" onclick="doCreateQuote()">حفظ العرض (مسودة)</button></div></div>';
   h+='<div class="card"><h2>العروض</h2>';
   if(!state.quotations.length)h+='<p class="muted">لا توجد عروض بعد.</p>';
@@ -1321,15 +1750,17 @@ function screenQuotations(){
   }
   return h+'</div>';
 }
-function doPrintQuote(qid){var r=printQuotation(qid);if(r.error)alert(r.error);}
+function doPrintQuote(qid){var r=printQuotation(qid);if(r.error){alert(r.error);return;}var q=quoteById(qid);logAudit("print_quotation","طباعة عرض السعر "+(q?q.number:""),q?q.number:"","عروض الأسعار");save();}
 function doWaQuote(qid){var r=sendQuoteWhatsApp(qid);if(r&&r.error)alert(r.error);}
 function doCreateQuote(){
   var pid=$("qProject").value;
-  var maint={included:$("qMaint").checked,type:$("qMaintType").value,amount:$("qMaintAmt").value,duration:$("qMaintDur").value};
+  var qm=qMaintState();
+  var maint={included:qm.included,type:qm.type,amount:qm.amount,duration:qm.duration};
   var r=createQuotation(pid,qLines(),maint,$("qNumber").value);
   var m=$("qMsg");
   if(r.error){if(m)m.innerHTML='<div class="err">'+esc(r.error)+'</div>';return;}
   state.ui.qLines=[{name:"",qty:1,price:""},{name:"",qty:1,price:""}];
+  state.ui.qMaint={included:false,type:CONTRACT_TYPES[0],amount:0,duration:""};
   render();var m2=$("qMsg");if(m2)m2.innerHTML='<div class="okbox">تم حفظ العرض '+esc(r.quotation.number)+' كمسودة — أرسله للعميل من جدول العروض.</div>';
 }
 function doSendQuote(qid){var r=sendQuotation(qid);if(r.error){alert(r.error);return;}render();}
@@ -1340,6 +1771,71 @@ function doClientResp(qid,dec){
   if(r.error){alert(r.error);return;}
   render();
 }
+/* ---------- الأصناف (شاشة) ---------- */
+function itemTableHtml(){
+  var list=searchItems(state.ui.itemFilter||"");
+  var h="";
+  if(!list.length)h='<p class="muted">لا توجد أصناف مطابقة.</p>';
+  else{
+    h='<table><tr><th>الكود</th><th>الاسم</th><th>الوحدة</th><th>سعر البيع</th><th>سعر التكلفة</th><th>الكمية (رصيد المخزون)</th><th>إجراءات</th></tr>';
+    list.forEach(function(it){
+      h+='<tr><td class="num">'+esc(it.code)+'</td><td>'+esc(it.name)+'</td><td>'+esc(it.unit||"—")+'</td><td class="num">'+fmtM(it.salePrice)+'</td><td class="num">'+fmtM(it.costPrice)+'</td><td class="num">'+it.qty+'</td><td>'+
+      '<button type="button" class="btn btn-ghost btn-sm" onclick="showEditItem(\''+it.id+'\')">تعديل</button> '+
+      '<button type="button" class="btn btn-danger btn-sm" onclick="delItem(\''+it.id+'\')">حذف</button></td></tr>';
+    });
+    h+='</table>';
+  }
+  return h;
+}
+function renderItemTable(){var b=$("itTableBox");if(b)b.innerHTML=itemTableHtml();}
+function applyItemFilter(v){state.ui.itemFilter=v;renderItemTable();}
+function screenItems(){
+  var ei=state.ui.editItemId?itemById(state.ui.editItemId):null;
+  var h='<div class="card"><h2>الأصناف</h2><p class="muted">سجّل أصناف المواد مع الوحدة وأسعار البيع والتكلفة والكمية — تُستخدم في بنود عروض الأسعار (F9 أو الكتابة لاختيار صنف فيملأ السعر والوحدة). الكمية هي رصيد المخزون: تُخصم عند صرف المواد وتُعاد عند المرتجع. الحذف مسموح فقط للصنف الذي لم تُسجَّل عليه أي حركة إطلاقاً؛ إن كانت عليه حركات يُمنع حذفه برسالة واضحة ويبقى التعديل مسموحاً.</p><div id="itMsg"></div>';
+  h+='<h3>'+(ei?"تعديل الصنف «"+esc(ei.name)+"»":"إضافة صنف جديد")+'</h3><div class="form-grid">'+
+  '<div><label>الكود (تلقائي، قابل للتعديل، لا يتكرر)</label><input id="niCode" class="inp num" value="'+(ei?esc(ei.code):esc(peekSerial("item","ITM")))+'" onkeydown="itemPickerKey(event,this,{kind:\'form\'})" oninput="itemPickerInput(this,{kind:\'form\'})"></div>'+
+  '<div><label>اسم الصنف *</label><input id="niName" class="inp" value="'+(ei?esc(ei.name):"")+'" placeholder="اكتب جزءاً من الاسم أو اضغط F9" onkeydown="itemPickerKey(event,this,{kind:\'form\'})" oninput="itemPickerInput(this,{kind:\'form\'})"></div>'+
+  '<div><label>الوحدة</label><input id="niUnit" class="inp" value="'+(ei?esc(ei.unit||""):"")+'" placeholder="مثال: قطعة / متر / علبة"></div>'+
+  '<div><label>سعر البيع</label><input id="niSale" type="number" min="0" step="0.01" class="inp" value="'+(ei?esc(ei.salePrice):"")+'"></div>'+
+  '<div><label>سعر التكلفة</label><input id="niCost" type="number" min="0" step="0.01" class="inp" value="'+(ei?esc(ei.costPrice):"")+'"></div>'+
+  '<div><label>الكمية</label><input id="niQty" type="number" min="0" step="1" class="inp" value="'+(ei?esc(ei.qty):"0")+'"></div></div>'+
+  '<div class="row" style="margin-top:.6rem"><button type="button" class="btn btn-navy" onclick="doSaveItem()">'+(ei?"حفظ التعديل":"إضافة صنف")+'</button>'+
+  (ei?'<button type="button" class="btn btn-ghost" onclick="cancelEditItem()">إلغاء التعديل</button>':"")+'</div>'+
+  '<div class="row" style="margin-top:.6rem"><label class="btn btn-ghost" style="cursor:pointer">📥 استيراد من Excel (CSV)<input type="file" accept=".csv,text/csv" class="hidden" onchange="doImportItems(this)"></label>'+
+  '<button type="button" class="btn btn-gold btn-sm" onclick="doExportItems()">📤 تصدير الأصناف إلى Excel</button></div>'+
+  '<p class="muted">الاستيراد من ملف CSV بأعمدة: الكود، الاسم، الوحدة، سعر البيع، سعر التكلفة، الكمية — صف الترويسة اختياري. الصف بلا اسم يُرفض، والكود المكرر يُتخطى، ويظهر تقرير بالأعداد بعد الاستيراد.</p></div>';
+  h+='<div class="card"><h2>قائمة الأصناف</h2><div style="margin-bottom:.6rem"><label>بحث</label><input id="itSearch" class="inp" placeholder="ابحث بالاسم أو الكود…" value="'+esc(state.ui.itemFilter||"")+'" oninput="applyItemFilter(this.value)"></div><div id="itTableBox">'+itemTableHtml()+'</div></div>';
+  return h;
+}
+function doSaveItem(){
+  var ei=state.ui.editItemId?itemById(state.ui.editItemId):null;
+  var m=$("itMsg");
+  var r=ei?updateItem(ei.id,{code:$("niCode").value,name:$("niName").value,unit:$("niUnit").value,salePrice:$("niSale").value,costPrice:$("niCost").value,qty:$("niQty").value}):createItem($("niCode").value,$("niName").value,$("niUnit").value,$("niSale").value,$("niCost").value,$("niQty").value);
+  if(r.error){if(m)m.innerHTML='<div class="err">'+esc(r.error)+'</div>';return;}
+  state.ui.editItemId=null;render();
+  var m2=$("itMsg");if(m2)m2.innerHTML='<div class="okbox">تم حفظ الصنف «'+esc(r.item.name)+'» ('+esc(r.item.code)+').</div>';
+}
+function showEditItem(id){state.ui.editItemId=id;render();}
+function cancelEditItem(){state.ui.editItemId=null;render();}
+function delItem(id){
+  var it=itemById(id);if(!it)return;
+  if(typeof confirm==="function"&&!confirm("هل تريد حذف الصنف «"+it.name+"» ("+it.code+")؟"))return;
+  var r=deleteItem(id);
+  if(r.error){var m=$("itMsg");if(m)m.innerHTML='<div class="err">'+esc(r.error)+'</div>';else alert(r.error);return;}
+  render();
+}
+function doImportItems(input){
+  var f=input&&input.files&&input.files[0];if(!f)return;
+  if(typeof FileReader==="undefined"){alert("متصفحك لا يدعم قراءة الملفات.");return;}
+  var rd=new FileReader();
+  rd.onload=function(){
+    var r=importItemsCSV(String(rd.result||""));
+    render();
+    var m=$("itMsg");if(m)m.innerHTML='<div class="okbox">تم الاستيراد: مستورد '+r.imported+' — مكرر '+r.duplicated+' — مرفوض '+r.rejected+'.</div>';
+  };
+  rd.readAsText(f);
+}
+function doExportItems(){exportItemsCSV();}
 /* ---------- التعميد (المدير العام) ---------- */
 function screenApprovals(){
   var queue=state.quotations.filter(function(q){return q.status==="client_accepted";});
@@ -1397,7 +1893,7 @@ function screenContracts(){
   qs.forEach(function(q){
     var existing=state.contracts.filter(function(c){return String(c.quotationId)===String(q.id);});
     h+='<div class="card" style="border:1px solid var(--gold)"><h3>عرض '+esc(q.number)+' — '+(projectById(q.projectId)?esc(projectById(q.projectId).clientName):"")+'</h3>'+
-    (existing.length?existing.map(function(c){return '<p>• عقد '+esc(c.number)+' — نوع: '+esc(c.type)+' — ملف: '+esc(c.fileName||"—")+' — جهّزه: '+esc(c.preparedBy||"—")+'</p>';}).join(""):'<p class="muted">لم يُجهَّز عقد بعد لهذا العرض.</p>')+
+    (existing.length?existing.map(function(c){return '<p>• عقد '+esc(c.number)+' — نوع: '+esc(c.type)+(c.source==="maintenance"?' — <b>عقد صيانة تلقائي</b> — القيمة: '+fmtM(c.amount||0)+' — المدة: '+esc(c.duration||"—"):"")+' — ملف: '+esc(c.fileName||"—")+' — جهّزه: '+esc(c.preparedBy||"—")+'</p>';}).join(""):'<p class="muted">لم يُجهَّز عقد بعد لهذا العرض.</p>')+
     '<div class="form-grid"><div><label>نوع العقد</label><select id="ctType-'+q.id+'" class="inp">'+CONTRACT_TYPES.map(function(x){return '<option>'+esc(x)+'</option>';}).join("")+'</select></div>'+
     '<div><label>اسم ملف العقد المرفق</label><input id="ctFile-'+q.id+'" class="inp" placeholder="مثال: عقد-صيانة-العميل.pdf"></div>'+
     '<div><label>رقم العقد (تلقائي، قابل للتعديل، لا يتكرر)</label><input id="ctNum-'+q.id+'" class="inp num" value="'+esc(peekSerial("contract","C"))+'"></div></div>'+
@@ -1497,14 +1993,36 @@ function editOpening(cid){
 }
 /* ---------- المستخدمون (المدير العام فقط) ---------- */
 function togglePwById(id){var p=$(id);if(!p)return;p.type=(p.type==="password")?"text":"password";}
+/* صلاحيات نموذج المستخدمين: تُهيأ عند فتح النموذج (صلاحيات المستخدم
+   نفسه عند التعديل، أو افتراضي الدور عند الإضافة)، وتُملأ تلقائياً
+   حسب الدور عند تغييره من القائمة، وتبقى قابلة للتعديل يدوياً. */
+function initUserPerms(eu){
+  var formKey=eu?eu.id:"new";
+  if(state.ui.permUserId===formKey)return;
+  state.ui.permUserId=formKey;
+  state.ui.permRole=eu?eu.role:"gm";
+  state.ui.permInit=eu?(Array.isArray(eu.permissions)?eu.permissions.slice():(ROLE_SCREENS[eu.role]||[]).slice()):(ROLE_SCREENS["gm"]||[]).slice();
+}
+function applyRolePerms(role){
+  state.ui.permRole=role;
+  state.ui.permInit=(ROLE_SCREENS[role]||[]).slice();
+  document.querySelectorAll(".nuPerm").forEach(function(c){c.checked=state.ui.permInit.indexOf(c.value)>=0;});
+}
+function readPermCheckboxes(){var out=[];document.querySelectorAll(".nuPerm:checked").forEach(function(c){out.push(c.value);});return out;}
 function screenUsers(){
   var eu=state.ui.editUserId?userById(state.ui.editUserId):null;
+  initUserPerms(eu);
+  var permInit=state.ui.permInit||[];
   var h='<div class="card"><h2>المستخدمون</h2><p class="muted">إنشاء المستخدمين فقط من داخل النظام وبواسطة المدير العام — لا يوجد تسجيل من شاشة الدخول.</p><div id="usrMsg"></div>'+
   '<h3>'+(eu?"تعديل المستخدم «"+esc(eu.username)+"»":"إضافة مستخدم جديد")+'</h3><div class="form-grid">'+
   '<div><label>اسم المستخدم *</label><input id="nuUser" class="inp" value="'+(eu?esc(eu.username):"")+'"'+(eu&&eu.username==="1"?" disabled":"")+'>'+(eu&&eu.username==="1"?'<p class="muted">اسم المدير العام «1» لا يُغيَّر.</p>':"")+'</div>'+
   '<div><label>كلمة المرور *</label><div class="pw-wrap"><input id="nuPass" type="password" class="inp" value="'+(eu?esc(eu.password||""):"")+'"><button type="button" class="eye" onclick="togglePwById(\'nuPass\')" title="إظهار / إخفاء كلمة المرور">👁</button></div></div>'+
   '<div><label>الاسم الكامل</label><input id="nuName" class="inp" value="'+(eu?esc(eu.fullName||""):"")+'"></div>'+
-  '<div><label>الدور *</label><select id="nuRole" class="inp">'+Object.keys(ROLES).map(function(k){return '<option value="'+k+'"'+(eu&&eu.role===k?" selected":"")+'>'+esc(ROLES[k].name)+'</option>';}).join("")+'</select></div></div>'+
+  '<div><label>رقم الجوال (لإشعار واتساب عند الإسناد)</label><input id="nuPhone" class="inp" dir="ltr" value="'+(eu?esc(eu.phone||""):"")+'" placeholder="05xxxxxxxx"></div>'+
+  '<div><label>الدور *</label><select id="nuRole" class="inp" onchange="applyRolePerms(this.value)">'+Object.keys(ROLES).map(function(k){return '<option value="'+k+'"'+(eu&&eu.role===k?" selected":"")+'>'+esc(ROLES[k].name)+'</option>';}).join("")+'</select></div>'+
+  '<h3 style="grid-column:1/-1">صلاحيات المستخدم</h3><p class="muted" style="grid-column:1/-1">تُملأ تلقائياً حسب الدور عند تغييره، وتبقى قابلة للتعديل. شاشة «التقارير الرقابية» للمدير العام فقط ولا تظهر هنا.</p>'+
+  PERM_SCREENS.map(function(s){return '<label style="display:block;font-weight:400"><input type="checkbox" class="nuPerm" value="'+s+'"'+(permInit.indexOf(s)>=0?" checked":"")+'> '+esc(SCREEN_TITLES[s])+'</label>';}).join("")+
+  '</div>'+
   '<div class="row" style="margin-top:.6rem"><button type="button" class="btn btn-navy" onclick="doCreateUser()">'+(eu?"حفظ التعديل":"إضافة مستخدم")+'</button>'+
   (eu?'<button type="button" class="btn btn-ghost" onclick="cancelEditUser()">إلغاء التعديل</button>':"")+'</div></div>';
   h+='<div class="card"><h2>قائمة المستخدمين</h2><table><tr><th>اسم المستخدم</th><th>الاسم</th><th>الدور</th><th>الحالة</th><th>إجراءات</th></tr>';
@@ -1524,17 +2042,23 @@ function cancelEditUser(){state.ui.editUserId=null;render();}
 function doCreateUser(){
   var eu=state.ui.editUserId?userById(state.ui.editUserId):null;
   var m=$("usrMsg");
+  var role=$("nuRole").value;
+  /* الصلاحيات من الخانات إن كان الدور المعروض هو الدور الذي مُلئت
+     الخانات له؛ وإن غُيّر الدور دون إطلاق change تُؤخذ من افتراضي
+     الدور حتى لا تُمنح صلاحيات دور آخر خطأً. */
+  var perms=(state.ui.permRole===role)?readPermCheckboxes():(ROLE_SCREENS[role]||[]).slice();
+  var phone=$("nuPhone")?$("nuPhone").value:"";
   if(eu){
-    var fields={fullName:$("nuName").value,role:$("nuRole").value,password:$("nuPass").value};
+    var fields={fullName:$("nuName").value,role:role,password:$("nuPass").value,phone:phone,permissions:perms};
     if(eu.username!=="1")fields.username=$("nuUser").value;
     var r2=updateUser(eu.id,fields);
     if(r2.error){if(m)m.innerHTML='<div class="err">'+esc(r2.error)+'</div>';return;}
-    state.ui.editUserId=null;render();var m3=$("usrMsg");if(m3)m3.innerHTML='<div class="okbox">تم حفظ تعديل المستخدم «'+esc(r2.user.username)+'».</div>';
+    state.ui.editUserId=null;state.ui.permUserId=null;render();var m3=$("usrMsg");if(m3)m3.innerHTML='<div class="okbox">تم حفظ تعديل المستخدم «'+esc(r2.user.username)+'».</div>';
     return;
   }
-  var r=createUser($("nuUser").value,$("nuPass").value,$("nuName").value,$("nuRole").value);
+  var r=createUser($("nuUser").value,$("nuPass").value,$("nuName").value,role,phone,perms);
   if(r.error){if(m)m.innerHTML='<div class="err">'+esc(r.error)+'</div>';return;}
-  render();var m2=$("usrMsg");if(m2)m2.innerHTML='<div class="okbox">تم إنشاء المستخدم «'+esc(r.user.username)+'» بدور '+esc(roleName(r.user.role))+'.</div>';
+  state.ui.permUserId=null;render();var m2=$("usrMsg");if(m2)m2.innerHTML='<div class="okbox">تم إنشاء المستخدم «'+esc(r.user.username)+'» بدور '+esc(roleName(r.user.role))+'.</div>';
 }
 function toggleUser(uid2){var u=userById(uid2);if(!u)return;updateUser(uid2,{active:u.active===false?true:false});render();}
 function resetUserPw(uid2){
@@ -1544,7 +2068,7 @@ function resetUserPw(uid2){
   if(r.error){alert(r.error);return;}
   render();var m=$("usrMsg");if(m)m.innerHTML='<div class="okbox">تمت إعادة تعيين كلمة المرور.</div>';
 }
-function delUser(uid2){var r=deleteUser(uid2);if(r.error){alert(r.error);return;}render();}
+function delUser(uid2){var u=userById(uid2);if(u&&typeof confirm==="function"&&!confirm("هل تريد حذف المستخدم «"+u.username+"»؟"))return;var r=deleteUser(uid2);if(r.error){alert(r.error);return;}render();}
 /* ---------- الموظفون والإجازات (الموارد البشرية) ---------- */
 function screenEmployees(){
   var h='<div class="card"><h2>الموظفون والإجازات</h2><p class="muted">الموارد البشرية تدير بيانات الموظفين والفنيين والإجازات فقط — لا ترى الأسعار ولا المديونيات.</p><div id="empMsg"></div>'+
@@ -1681,10 +2205,7 @@ function screenAccounts(){
   '<button type="button" class="btn btn-danger" onclick="showAccForm(\'expense\')">➖ تسجيل مصروف</button>'+
   '<button type="button" class="btn btn-ghost" onclick="showAccMoves()" style="background:rgba(255,255,255,.12);color:#fff">📋 سجل الحركات</button>'+
   '<button type="button" class="btn btn-ghost" onclick="goScreen(\'reports\')" style="background:rgba(255,255,255,.12);color:#fff">📊 التقارير</button>'+
-  '<button type="button" class="btn btn-ghost" onclick="goScreen(\'settings\')" style="background:rgba(255,255,255,.12);color:#fff">⚙ الإعدادات</button>'+
-  '<button type="button" class="btn btn-ghost" onclick="showAccAbout()" style="background:rgba(255,255,255,.12);color:#fff">ℹ️ حول البرنامج</button>'+
-  '<button type="button" class="btn btn-ghost" onclick="downloadBackup()" style="background:rgba(255,255,255,.12);color:#fff">💾 نسخة احتياطية</button>'+
-  '<label class="btn btn-ghost" style="cursor:pointer;background:rgba(255,255,255,.12);color:#fff">↩️ استرجاع نسخة<input type="file" accept=".json" class="hidden" onchange="restoreBackup(this)"></label>';
+  '<button type="button" class="btn btn-ghost" onclick="goScreen(\'settings\')" style="background:rgba(255,255,255,.12);color:#fff">⚙ الإعدادات</button>';
   if(state.ui.accForm){
     var isRev=state.ui.accForm==="revenue";
     h+='<div class="panel"><h3>'+(isRev?"تسجيل إيراد":"تسجيل مصروف")+'</h3><div id="accMsg"></div>'+
@@ -1696,17 +2217,12 @@ function screenAccounts(){
     '<div class="row" style="margin-top:.6rem"><button type="button" class="btn btn-gold" onclick="doAccTransaction()">حفظ الحركة</button>'+
     '<button type="button" class="btn btn-ghost" onclick="hideAccForm()" style="background:rgba(255,255,255,.12);color:#fff">إلغاء</button></div></div>';
   }
-  if(state.ui.accAbout){
-    h+='<div class="panel"><h3>حول البرنامج</h3><p style="line-height:1.8">نظام إدارة مشاريع المقاولات — إدارة مالية متكاملة: إيرادات ومصروفات، أرصدة البنك والخزنة، ميزان مراجعة بحسابات العملاء، ومرتجع مواد. جميع الأرقام من بيانات النظام الحقيقية.</p><button type="button" class="btn btn-ghost" onclick="hideAccAbout()" style="background:rgba(255,255,255,.12);color:#fff">إغلاق</button></div>';
-  }
   h+='</div></div></div>';
   return h;
 }
 function setAccPeriod(p){state.ui.accPeriod=p;render();}
-function showAccForm(kind){state.ui.accForm=kind;state.ui.accAbout=false;render();}
+function showAccForm(kind){state.ui.accForm=kind;render();}
 function hideAccForm(){state.ui.accForm=null;render();}
-function showAccAbout(){state.ui.accAbout=true;render();}
-function hideAccAbout(){state.ui.accAbout=false;render();}
 function showAccMoves(){var els=document.querySelectorAll(".acc .panel");var last=els[els.length-1];if(last&&last.scrollIntoView)try{last.scrollIntoView();}catch(e){}}
 function doAccTransaction(){
   var kind=state.ui.accForm||"expense";
@@ -1753,6 +2269,16 @@ function screenSettings(){
     '<div><label>اسم الشركة</label><input id="suName" class="inp" value="'+esc(s.companyName)+'"></div>'+
     '<div><label>اسم الشركة (إنجليزي)</label><input id="suNameEn" class="inp" dir="ltr" value="'+esc(s.companyNameEn||"")+'"></div>'+
     '<div><label>السجل التجاري</label><input id="suReg" class="inp num" value="'+esc(s.commercialReg||"")+'"></div>'+
+    '<div><label>الرقم الضريبي</label><input id="suTax" class="inp num" dir="ltr" value="'+esc(s.taxNumber||"")+'"></div>'+
+    '<h3 style="grid-column:1/-1">بيانات المالك والعنوان الوطني</h3>'+
+    '<div><label>اسم مالك الشركة</label><input id="suOwner" class="inp" value="'+esc(s.ownerName||"")+'"></div>'+
+    '<div><label>رقم مالك الشركة</label><input id="suOwnerPhone" class="inp" dir="ltr" value="'+esc(s.ownerPhone||"")+'"></div>'+
+    '<div><label>المدينة</label><input id="suCity" class="inp" value="'+esc(s.city||"")+'"></div>'+
+    '<div><label>اسم الحي</label><input id="suDistrict" class="inp" value="'+esc(s.district||"")+'"></div>'+
+    '<div><label>اسم الشارع</label><input id="suStreet" class="inp" value="'+esc(s.street||"")+'"></div>'+
+    '<div><label>رقم المبنى</label><input id="suBuilding" class="inp num" value="'+esc(s.buildingNo||"")+'"></div>'+
+    '<div><label>رمز البريد</label><input id="suPostal" class="inp num" dir="ltr" value="'+esc(s.postalCode||"")+'"></div>'+
+    '<div><label>الرقم الفرعي</label><input id="suSub" class="inp num" dir="ltr" value="'+esc(s.subNumber||"")+'"></div>'+
     '<div><label>العنوان</label><input id="suAddr" class="inp" value="'+esc(s.address||"")+'"></div>'+
     '<div><label>الهواتف</label><input id="suPhones" class="inp" dir="ltr" value="'+esc(s.phones||"")+'"></div>'+
     '<div><label>البريد الإلكتروني</label><input id="suEmail" class="inp" dir="ltr" value="'+esc(s.email||"")+'"></div>'+
@@ -1780,20 +2306,28 @@ function doSaveSetup(){
   var nc2=($("suCode2")?$("suCode2").value:"").trim();
   var m=$("setupMsg");
   if(nc&&nc!==nc2){if(m)m.innerHTML='<div class="err">رمز التهيئة الجديد وتأكيده غير متطابقين.</div>';return;}
-  var r=saveSetupSettings({companyName:$("suName").value,companyNameEn:$("suNameEn").value,commercialReg:$("suReg").value,address:$("suAddr").value,phones:$("suPhones").value,email:$("suEmail").value,currency:$("suCur").value,vatRate:$("suVat").value,bankBalance:$("suBank").value,safeBalance:$("suSafe").value,newCode:nc||undefined});
+  var r=saveSetupSettings({companyName:$("suName").value,companyNameEn:$("suNameEn").value,commercialReg:$("suReg").value,taxNumber:$("suTax").value,ownerName:$("suOwner").value,ownerPhone:$("suOwnerPhone").value,city:$("suCity").value,district:$("suDistrict").value,street:$("suStreet").value,buildingNo:$("suBuilding").value,postalCode:$("suPostal").value,subNumber:$("suSub").value,address:$("suAddr").value,phones:$("suPhones").value,email:$("suEmail").value,currency:$("suCur").value,vatRate:$("suVat").value,bankBalance:$("suBank").value,safeBalance:$("suSafe").value,newCode:nc||undefined});
   if(r.error){if(m)m.innerHTML='<div class="err">'+esc(r.error)+'</div>';return;}
   render();var m2=$("setupMsg");if(m2)m2.innerHTML='<div class="okbox">تم حفظ التهيئة'+(nc?" — ورمز التهيئة الجديد يعمل من الآن.":".")+'</div>';
 }
 function doSaveSettings(){
   var s=state.settings[0];if(!s){state.settings=[{id:"main"}];s=state.settings[0];}
   s.companyName=$("stName").value;s.currency=$("stCur").value;s.vatRate=Number($("stVat").value)||15;
-  save();render();var m=$("setMsg");if(m)m.innerHTML='<div class="okbox">تم حفظ الإعدادات.</div>';
+  logAudit("save_settings","حفظ الإعدادات (اسم الشركة والعملة ونسبة الضريبة)","","الإعدادات");save();render();var m=$("setMsg");if(m)m.innerHTML='<div class="okbox">تم حفظ الإعدادات.</div>';
+}
+function backupSnapshot(){
+  /* نسخة البيانات للتنزيل: سجل التدقيق لا يُشمل فيها أبداً — يبقى في
+     النظام ولا يُسترجع من نسخة قديمة. */
+  var snap=JSON.parse(JSON.stringify(state));
+  delete snap.audit_log;
+  return snap;
 }
 function downloadBackup(){
   try{
-    var blob=new Blob([JSON.stringify(state)],{type:"application/json"});
+    var blob=new Blob([JSON.stringify(backupSnapshot())],{type:"application/json"});
     var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="MSHRY-company.json";a.click();
     setTimeout(function(){try{URL.revokeObjectURL(a.href);}catch(e){}},1000);
+    logAudit("backup","تنزيل نسخة احتياطية (بدون سجل التدقيق)","","الإعدادات");save();
   }catch(e){alert("تعذّر تنزيل النسخة.");}
 }
 function restoreBackup(input){
@@ -1806,7 +2340,10 @@ function restoreBackup(input){
       var s=JSON.parse(String(rd.result||""));
       if(!s||!s.settings){alert("ملف النسخة غير صالح.");return;}
       var keepUser=state.user;
-      state=normalizeState(s);state.user=keepUser;state.screen="dashboard";state.ui={};ensureAdminUser();saveLocal();render();
+      var keepAudit=Array.isArray(state.audit_log)?state.audit_log.slice():[];
+      state=normalizeState(s);state.audit_log=keepAudit;state.user=keepUser;state.screen="dashboard";state.ui={};ensureAdminUser();
+      logAudit("restore","استرجاع نسخة احتياطية — بقي سجل التدقيق كما هو ("+keepAudit.length+" سجلاً قبل الاسترجاع)","","الإعدادات");
+      saveLocal();render();
       alert("تمت الاستعادة من النسخة.");
     }catch(e){alert("تعذّر قراءة ملف النسخة.");}
   };
@@ -1854,9 +2391,21 @@ window.MSHRY={
   exportTrialExcel:exportTrialExcel,exportStatementExcel:exportStatementExcel,
   trialPrintHtml:trialPrintHtml,statementPrintHtml:statementPrintHtml,
   printTrialReport:printTrialReport,printStatementReport:printStatementReport,
-  downloadBackup:downloadBackup,restoreBackup:restoreBackup,
+  downloadBackup:downloadBackup,restoreBackup:restoreBackup,backupSnapshot:backupSnapshot,
+  logAudit:logAudit,filterAudit:filterAudit,applyAuditFilters:applyAuditFilters,
+  clearAuditFilters:clearAuditFilters,buildAuditCSV:buildAuditCSV,exportAuditExcel:exportAuditExcel,
+  auditPrintHtml:auditPrintHtml,printAuditReport:printAuditReport,auditActionLabel:auditActionLabel,
   companyInfo:companyInfo,paginateRows:paginateRows,letterheadPage:letterheadPage,
-  receiptPrintHtml:receiptPrintHtml,printReceipt:printReceipt
+  receiptPrintHtml:receiptPrintHtml,printReceipt:printReceipt,doPrintQuote:doPrintQuote,
+  createItem:createItem,updateItem:updateItem,deleteItem:deleteItem,
+  itemById:itemById,itemByCode:itemByCode,itemByName:itemByName,
+  itemHasMovements:itemHasMovements,searchItems:searchItems,
+  importItemsCSV:importItemsCSV,buildItemsCSV:buildItemsCSV,exportItemsCSV:exportItemsCSV,
+  normalizePhone:normalizePhone,buildTechnicianWhatsApp:buildTechnicianWhatsApp,
+  sendTechnicianWhatsApp:sendTechnicianWhatsApp,doWaTechnician:doWaTechnician,
+  qMaintState:qMaintState,qMaintToggle:qMaintToggle,qMaintField:qMaintField,
+  userScreens:userScreens,canSee:canSee,closeItemPicker:closeItemPicker,closeItemSuggest:closeItemSuggest,
+  openItemPicker:openItemPicker,pickItem:pickItem,applyRolePerms:applyRolePerms
 };
 boot();
 </script>
