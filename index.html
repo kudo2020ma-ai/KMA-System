@@ -189,7 +189,12 @@ var ADMIN_USER="1";
 var COLLECTIONS=["users","clients","projects","assignments","media","quotations","approvals","contracts","material_issues","payments","notifications","settings","counters","material_returns","transactions","items","audit_log"];
 var PROJECT_TYPES=["تركيب كاميرات","صيانة","توريد أدوات سلامة","مضخات","أخرى"];
 var CONTRACT_TYPES=["صيانة","كاميرات","نظافة","مكافحة حشرات"];
+/* الأدوار: «مدير النظام» (admin) مسؤول النظام وصاحب كل الصلاحيات،
+   و«المدير العام» (gm) مدير في الشركة (دور أعمال: اعتماد العروض
+   والتقارير) — صلاحياته محدودة افتراضياً ولا تزيد إلا بمنح صريح من
+   مدير النظام من شاشة المستخدمين. */
 var ROLES={
+  admin:{name:"مدير النظام",label:"مدير نظام"},
   gm:{name:"المدير العام",label:"مدير عام"},
   projects_manager:{name:"مدير المشاريع",label:"مدير مشاريع"},
   technician:{name:"فني",label:"فني"},
@@ -198,9 +203,16 @@ var ROLES={
   hr:{name:"الموارد البشرية",label:"موارد بشرية"},
   secretariat:{name:"السكرتارية",label:"سكرتارية"}
 };
-/* الصلاحيات: ما الذي يراه كل دور */
+/* الصلاحيات: ما الذي يراه كل دور افتراضياً.
+   مدير النظام: كل الشاشات بلا استثناء (بما فيها المستخدمون والإعدادات
+   وتهيئة النظام والتقارير الرقابية).
+   المدير العام: دور أعمال فقط — اعتماد العروض والتقارير ولوحات الإدارة؛
+   لا يملك افتراضياً إدارة المستخدمين ولا الإعدادات ولا التقارير الرقابية،
+   ولا تصل إليه أي صلاحية إضافية إلا إذا منحها له مدير النظام صراحةً
+   من شاشة المستخدمين. */
 var ROLE_SCREENS={
-  gm:["dashboard","projects","tasks","quotations","approvals","materials","returns","contracts","financial","accounts","reports","audit","users","employees","notifications","settings","items"],
+  admin:["dashboard","projects","tasks","quotations","approvals","materials","returns","contracts","financial","accounts","reports","audit","users","employees","notifications","settings","items"],
+  gm:["dashboard","projects","quotations","approvals","financial","accounts","reports","notifications","items"],
   projects_manager:["dashboard","projects","tasks","quotations","approvals","notifications","items"],
   technician:["tasks","notifications"],
   accounts:["dashboard","materials","returns","financial","accounts","reports","notifications","items"],
@@ -217,8 +229,10 @@ var SCREEN_TITLES={
   notifications:"الإشعارات",settings:"الإعدادات",items:"الأصناف"
 };
 /* الشاشات التي تظهر كخانات اختيار في صلاحيات المستخدم — كل الشاشات
-   عدا «التقارير الرقابية» فهي للمدير العام فقط ولا تُمنح لأحد. */
-var PERM_SCREENS=["dashboard","projects","tasks","quotations","approvals","materials","returns","contracts","financial","accounts","reports","users","employees","notifications","settings","items"];
+   بما فيها «التقارير الرقابية»: لا تُمنح إلا صراحةً من مدير النظام
+   (المدير العام لا يملكها افتراضياً)، وشاشة «المستخدمون» نفسها
+   لا يراها افتراضياً إلا مدير النظام. */
+var PERM_SCREENS=["dashboard","projects","tasks","quotations","approvals","materials","returns","contracts","financial","accounts","reports","audit","users","employees","notifications","settings","items"];
 function $(id){return document.getElementById(id);}
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
 function today(){var d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
@@ -265,20 +279,35 @@ function normalizeState(s){
   }
   d.clients.forEach(function(c){if(c.taxNumber===undefined)c.taxNumber="";});
   if(!Array.isArray(d.items))d.items=[];
+  /* رقم نسخة الجلسة (rev): كل مستخدم له رقم نسخة يزيد عند أي تعديل
+     عليه؛ السجلات القديمة بلا rev تُعامل كنسخة 1. */
+  d.users.forEach(function(u){if(u&&(typeof u.rev!=="number"||isNaN(u.rev)))u.rev=1;});
   return d;
 }
 var state=loadState();
 state.user=null;state.screen="dashboard";state.ui={};
-function defaultAdminUser(){return {id:"u-1",username:"1",password:"1",fullName:"المدير العام",role:"gm",phone:"",permissions:null,companyId:COMPANY_ID,active:true,createdAt:nowISO()};}
+/* الحساب الافتراضي 1/1 هو «مدير النظام» (admin) بكل الصلاحيات —
+   وليس «المدير العام» (دور أعمال في الشركة). */
+function defaultAdminUser(){return {id:"u-1",username:"1",password:"1",fullName:"مدير النظام",role:"admin",phone:"",permissions:["dashboard","projects","tasks","quotations","approvals","materials","returns","contracts","financial","accounts","reports","audit","users","employees","notifications","settings","items"],companyId:COMPANY_ID,active:true,rev:1,createdAt:nowISO()};}
 function ensureAdminUser(){
   if(!Array.isArray(state.users))state.users=[];
   var found=null;
   for(var i=0;i<state.users.length;i++){if(state.users[i]&&state.users[i].username==="1"){found=state.users[i];break;}}
-  if(!found){found=defaultAdminUser();state.users.unshift(found);}
+  if(!found){found=defaultAdminUser();state.users.unshift(found);return found;}
+  /* ترحيل حسابات قديمة: إن كان حساب "1" ما زال بدور «المدير العام»
+     (من نسخ سابقة) يُرفَّع إلى «مدير النظام» بكل الصلاحيات، وتُبطل
+     جلسته الحالية (rev+1) ليعيد الدخول بالدور الصحيح. */
+  if(found.role==="gm"){
+    found.role="admin";found.fullName="مدير النظام";
+    found.permissions=["dashboard","projects","tasks","quotations","approvals","materials","returns","contracts","financial","accounts","reports","audit","users","employees","notifications","settings","items"];
+    found.rev=(Number(found.rev)||1)+1;
+  }
+  if(typeof found.rev!=="number"||isNaN(found.rev))found.rev=1;
   return found;
 }
-/* يُزرع المدير 1/1 فقط عند غياب حساب "1" تماماً. إن وُجد — حتى بعد تغيير
-   كلمة مروره أو إيقافه — لا يُمسّ إطلاقاً. */
+/* يُزرع مدير النظام 1/1 فقط عند غياب حساب "1" تماماً. إن وُجد — حتى بعد
+   تغيير كلمة مروره أو إيقافه — لا يُمسّ إطلاقاً (ولا يُستعاد الرمز
+   القديم عند أي إعادة تحميل). */
 ensureAdminUser();
 function saveLocal(){try{var j=JSON.stringify(state);localStorage.setItem(COMPANY_KEY,j);localStorage.setItem(BKKEY,j);localStorage.setItem(BKMETA,new Date().toISOString());}catch(e){}}
 function save(){saveLocal();scheduleSyncPush();}
@@ -312,9 +341,9 @@ function syncSetBadge(){
 }
 function syncNote(){
   var n=$("loginModeNote");if(!n)return;
-  if(SYNC.mode==="server"){n.textContent="متصل بالخادم: بيانات الشركة محفوظة مركزياً في قاعدة البيانات الواحدة المشتركة، وتظهر على جميع الأجهزة بعد الدخول بنفس الحساب. إنشاء المستخدمين يكون من داخل النظام عبر شاشة المستخدمين وبواسطة المدير العام فقط.";}
-  else if(SYNC.serverMode==="local-json"){n.textContent="تنبيه: قاعدة بيانات الخادم المشتركة غير متصلة بعد — الخادم يعمل بوضع التخزين المحلي المؤقت الذي لا يحفظ بين الطلبات، فالبيانات محفوظة على هذا الجهاز فقط الآن ولن تظهر على جهاز آخر. إنشاء المستخدمين يكون من داخل النظام عبر شاشة المستخدمين وبواسطة المدير العام فقط.";}
-  else{n.textContent="إنشاء المستخدمين يكون من داخل النظام عبر شاشة المستخدمين وبواسطة المدير العام فقط — لا يوجد تسجيل من شاشة الدخول.";}
+  if(SYNC.mode==="server"){n.textContent="متصل بالخادم: بيانات الشركة محفوظة مركزياً في قاعدة البيانات الواحدة المشتركة، وتظهر على جميع الأجهزة بعد الدخول بنفس الحساب. إنشاء المستخدمين يكون من داخل النظام عبر شاشة المستخدمين وبواسطة مدير النظام فقط.";}
+  else if(SYNC.serverMode==="local-json"){n.textContent="تنبيه: قاعدة بيانات الخادم المشتركة غير متصلة بعد — الخادم يعمل بوضع التخزين المحلي المؤقت الذي لا يحفظ بين الطلبات، فالبيانات محفوظة على هذا الجهاز فقط الآن ولن تظهر على جهاز آخر. إنشاء المستخدمين يكون من داخل النظام عبر شاشة المستخدمين وبواسطة مدير النظام فقط.";}
+  else{n.textContent="إنشاء المستخدمين يكون من داخل النظام عبر شاشة المستخدمين وبواسطة مدير النظام فقط — لا يوجد تسجيل من شاشة الدخول.";}
 }
 function syncCheck(){
   if(typeof fetch!=="function"){SYNC.checked=true;syncSetBadge();return Promise.resolve(false);}
@@ -438,7 +467,7 @@ function findLocalUser(un){
 function localLogin(un,pw){
   var u=findLocalUser(un);
   if(!u)return null;
-  if(u.active===false)return {error:"هذا الحساب موقوف — راجع المدير العام."};
+  if(u.active===false)return {error:"هذا الحساب موقوف — راجع مدير النظام."};
   if(String(u.password)!==String(pw))return null;
   return {username:u.username,fullName:u.fullName||u.username,role:u.role};
 }
@@ -451,8 +480,9 @@ function doLogin(){
   function finish(userObj){
     var u=findLocalUser(userObj.username);
     if(!u){fail("بيانات الدخول غير صحيحة.");return false;}
-    if(u.active===false){fail("هذا الحساب موقوف — راجع المدير العام.");return false;}
-    state.user={id:u.id,username:u.username,fullName:u.fullName||u.username,role:u.role,permissions:Array.isArray(u.permissions)?u.permissions.slice():null};
+    if(u.active===false){fail("هذا الحساب موقوف — راجع مدير النظام.");return false;}
+    state.user={id:u.id,username:u.username,fullName:u.fullName||u.username,role:u.role,permissions:Array.isArray(u.permissions)?u.permissions.slice():null,rev:Number(u.rev)||1};
+    state.ui.sessionMsg=null;
     logAudit("login_success","تسجيل دخول ناجح للمستخدم "+u.username+" ("+roleName(u.role)+")","","الدخول");
     state.screen=(u.role==="technician")?"tasks":(u.role==="hr"?"employees":(u.role==="storekeeper"?"materials":(u.role==="secretariat"?"contracts":"dashboard")));
     if(err)err.classList.add("hidden");
@@ -479,22 +509,47 @@ function logout(){
   if(state.user){logAudit("logout","تسجيل خروج المستخدم "+(state.user.fullName||state.user.username)+" ("+state.user.username+")","","الدخول");saveLocal();if(SYNC.mode==="server"&&SYNC.token)syncPushNow();}
   state.user=null;state.screen="dashboard";try{sessionStorage.removeItem("MSHRY_sync_token");}catch(e){}SYNC.token=null;render();
 }
+/* ---------- سريان تعديل المستخدم فوراً (rev) ----------
+   كل مستخدم يحمل رقم نسخة rev يزيد عند أي تعديل عليه (اسم مستخدم،
+   كلمة مرور، دور، صلاحيات، إيقاف/تفعيل). لقطة الجلسة state.user تحفظ
+   الـ rev لحظة الدخول، وعند كل عرض (render) تُقارن بالسجل الحالي:
+   - السجل محذوف أو موقوف → خروج إجباري.
+   - الـ rev تغيّر (عدّله مدير النظام من جهاز آخر أو من هذه الجلسة) →
+     خروج إجباري وإعادة دخول بالبيانات الجديدة؛ فلا يبقى رمز قديم
+     ولا صلاحيات قديمة سارية أبداً. يعمل أيضاً بعد مزامنة من الخادم. */
+function forceLogout(msg){
+  if(state.user){try{logAudit("logout","تسجيل خروج إجباري للمستخدم "+(state.user.fullName||state.user.username)+" ("+state.user.username+") — "+msg,"","الدخول");}catch(e){}}
+  state.user=null;state.screen="dashboard";state.ui.sessionMsg=msg;
+  try{sessionStorage.removeItem("MSHRY_sync_token");}catch(e){}SYNC.token=null;saveLocal();
+}
+function validateSession(){
+  var u=state.user;if(!u)return true;
+  var full=userById(u.id);
+  if(!full){forceLogout("حُذف حسابك من النظام — سجّل الدخول مجدداً.");return false;}
+  if(full.active===false){forceLogout("أُوقف حسابك — راجع مدير النظام.");return false;}
+  if(Number(full.rev||1)!==Number(u.rev||1)){forceLogout("أُجري تعديل على حسابك (اسم المستخدم أو كلمة المرور أو الدور أو الصلاحيات) — سجّل الدخول مجدداً بالبيانات الجديدة.");return false;}
+  return true;
+}
 function currentUser(){return state.user;}
-/* الصلاحيات الفعلية للمستخدم: المدير العام يرى كل الشاشات دائماً؛
+/* الصلاحيات الفعلية للمستخدم: مدير النظام يرى كل الشاشات دائماً؛
    غيره يرى قائمة permissions الخاصة به إن كانت مصفوفة، وإلا
-   افتراضي دوره من ROLE_SCREENS. السجل الكامل للمستخدم (وفيه
-   permissions) يُقرأ من state.users لأن state.user نسخة مختصرة. */
+   افتراضي دوره من ROLE_SCREENS. المدير العام لا يملك افتراضياً
+   (المستخدمون/الإعدادات/التقارير الرقابية) إلا بمنح صريح من
+   مدير النظام. السجل الكامل للمستخدم (وفيه permissions) يُقرأ
+   من state.users لأن state.user نسخة مختصرة. */
 function userScreens(u){
   if(!u)return [];
-  if(u.role==="gm")return Object.keys(SCREEN_TITLES);
+  if(u.role==="admin")return Object.keys(SCREEN_TITLES);
   var full=userById(u.id);
   if(full&&Array.isArray(full.permissions))return full.permissions;
   return ROLE_SCREENS[u.role]||[];
 }
 function canSee(screen){var u=state.user;if(!u)return false;return userScreens(u).indexOf(screen)>=0;}
 function canPrice(){var u=state.user;if(!u)return false;return u.role!=="technician"&&u.role!=="hr";}
-function isGM(){return state.user&&state.user.role==="gm";}
-function isAccounts(){return state.user&& (state.user.role==="accounts"||state.user.role==="gm");}
+/* التعميد الإلكتروني صلاحية «المدير العام» أصلاً؛ ومدير النظام يملكها
+   أيضاً باعتباره صاحب كل الصلاحيات بلا استثناء. */
+function isGM(){return state.user&&(state.user.role==="gm"||state.user.role==="admin");}
+function isAccounts(){return state.user&& (state.user.role==="accounts"||state.user.role==="gm"||state.user.role==="admin");}
 function notify(targetUserId,targetRole,title,body,refs){
   var n={id:uid("ntf"),userId:targetUserId||null,role:targetRole||null,title:title,body:body||"",projectId:refs&&refs.projectId||null,quotationId:refs&&refs.quotationId||null,read:false,createdAt:nowISO()};
   state.notifications.unshift(n);return n;
@@ -535,9 +590,20 @@ var AUDIT_ACTIONS={
 };
 function auditActionLabel(a){return AUDIT_ACTIONS[a]||a;}
 function auditRoleLabel(r){return r==="system"?"النظام":roleName(r);}
+/* عرض المستخدم في سجل التدقيق: يُحلّ الاسم الحالي من سجل المستخدم
+   (بالمعرّف) حتى بعد تغيير اسم المستخدم؛ وإن حُذف المستخدم أو كان
+   الحدث قديماً بلا معرّف، يُعرض الاسم المحفوظ وقت الحدث. */
+function auditDisplayUser(e){
+  var full=e&&e.userId?userById(e.userId):null;
+  if(full)return {username:full.username,fullName:full.fullName||full.username,role:full.role};
+  return {username:e?e.username:"—",fullName:e?(e.fullName||e.username):"—",role:e?e.role:"system"};
+}
 function logAudit(action,summary,docNo,screen,who){
   var u=who||state.user;
-  var e={id:uid("al"),at:nowISO(),username:u?u.username:"—",fullName:u?(u.fullName||u.username):"النظام",role:u?u.role:"system",action:action,screen:screen||"",docNo:docNo||"",summary:String(summary||"")};
+  /* userId يُحفظ مع كل حدث حتى يعرض سجل التدقيق الاسم الحالي للمستخدم
+     حتى بعد تغيير اسم المستخدم — أما username/fullName فيُحفظان
+     كنسخة تاريخية للحالات القديمة بلا userId. */
+  var e={id:uid("al"),at:nowISO(),userId:u?u.id:null,username:u?u.username:"—",fullName:u?(u.fullName||u.username):"النظام",role:u?u.role:"system",action:action,screen:screen||"",docNo:docNo||"",summary:String(summary||"")};
   if(!Array.isArray(state.audit_log))state.audit_log=[];
   state.audit_log.push(e);
   return e;
@@ -1086,11 +1152,12 @@ function filterAudit(){
   var f=auditFilters();
   var rows=(state.audit_log||[]).slice().sort(function(a,b){return String(b.at||"").localeCompare(String(a.at||""));});
   return rows.filter(function(e){
-    if(f.user&&String(e.username)!==String(f.user))return false;
+    var du=auditDisplayUser(e);
+    if(f.user&&String(du.username)!==String(f.user))return false;
     if(f.action&&e.action!==f.action)return false;
     if(f.from&&String(e.at||"").slice(0,10)<f.from)return false;
     if(f.to&&String(e.at||"").slice(0,10)>f.to)return false;
-    if(f.q){var s=(e.summary||"")+" "+(e.docNo||"")+" "+(e.username||"")+" "+(e.fullName||"")+" "+auditActionLabel(e.action);if(s.indexOf(f.q)<0)return false;}
+    if(f.q){var s=(e.summary||"")+" "+(e.docNo||"")+" "+(du.username||"")+" "+(du.fullName||"")+" "+auditActionLabel(e.action);if(s.indexOf(f.q)<0)return false;}
     return true;
   });
 }
@@ -1106,13 +1173,13 @@ function applyAuditFilters(){
 function clearAuditFilters(){state.ui.auditFilters={user:"",action:"",from:"",to:"",q:""};render();}
 function auditUsers(){
   var seen={};var out=[];
-  (state.audit_log||[]).forEach(function(e){var k=String(e.username||"");if(k&&!seen[k]){seen[k]=1;out.push({username:k,fullName:e.fullName||k});}});
+  (state.audit_log||[]).forEach(function(e){var du=auditDisplayUser(e);var k=String(du.username||"");if(k&&!seen[k]){seen[k]=1;out.push({username:k,fullName:du.fullName||k});}});
   return out;
 }
 function buildAuditCSV(){
   var rows=filterAudit();
   var out=[["التقارير الرقابية — سجل العمليات"],["التاريخ والوقت","المستخدم","الاسم","الدور","العملية","الشاشة","رقم المستند","التفاصيل"]];
-  rows.forEach(function(e){out.push([fmtDateTime(e.at),e.username,e.fullName,auditRoleLabel(e.role),auditActionLabel(e.action),e.screen||"",e.docNo||"",e.summary||""]);});
+  rows.forEach(function(e){var du=auditDisplayUser(e);out.push([fmtDateTime(e.at),du.username,du.fullName,auditRoleLabel(du.role),auditActionLabel(e.action),e.screen||"",e.docNo||"",e.summary||""]);});
   return "\uFEFF"+out.map(function(r){return r.map(function(c){return '"'+String(c==null?"":c).replace(/"/g,'""')+'"';}).join(",");}).join("\r\n");
 }
 function exportAuditExcel(){downloadTextFile("audit-log.csv",buildAuditCSV(),"text/csv;charset=utf-8");return true;}
@@ -1120,7 +1187,7 @@ function auditPrintHtml(){
   var rows=filterAudit();
   var title='<h1>التقارير الرقابية</h1><h2>سجل العمليات — التاريخ: '+today()+' — عدد العمليات: '+rows.length+'</h2>';
   var head='<colgroup><col style="width:17%"><col style="width:12%"><col style="width:18%"><col style="width:11%"><col style="width:42%"></colgroup><tr><th>التاريخ والوقت</th><th>المستخدم</th><th>العملية</th><th>رقم المستند</th><th>التفاصيل</th></tr>';
-  var rs=rows.map(function(e){return '<tr><td>'+fmtDateTime(e.at)+'</td><td>'+esc(e.username)+' ('+esc(auditRoleLabel(e.role))+')</td><td>'+esc(auditActionLabel(e.action))+'</td><td>'+esc(e.docNo||"—")+'</td><td>'+esc(e.summary||"")+'</td></tr>';});
+  var rs=rows.map(function(e){var du=auditDisplayUser(e);return '<tr><td>'+fmtDateTime(e.at)+'</td><td>'+esc(du.username)+' ('+esc(auditRoleLabel(du.role))+')</td><td>'+esc(auditActionLabel(e.action))+'</td><td>'+esc(e.docNo||"—")+'</td><td>'+esc(e.summary||"")+'</td></tr>';});
   var pages=paginateRows(rs,24,0);
   var out="";
   pages.forEach(function(pr,i){
@@ -1151,7 +1218,8 @@ function screenAudit(){
   else{
     h+='<table><tr><th>التاريخ والوقت</th><th>المستخدم</th><th>العملية</th><th>الشاشة</th><th>رقم المستند</th><th>التفاصيل</th></tr>';
     rows.forEach(function(e){
-      h+='<tr><td class="num">'+fmtDateTime(e.at)+'</td><td>'+esc(e.fullName)+' ('+esc(e.username)+')</td><td>'+esc(auditActionLabel(e.action))+'</td><td>'+esc(e.screen||"—")+'</td><td class="num">'+esc(e.docNo||"—")+'</td><td>'+esc(e.summary||"")+'</td></tr>';
+      var du=auditDisplayUser(e);
+      h+='<tr><td class="num">'+fmtDateTime(e.at)+'</td><td>'+esc(du.fullName)+' ('+esc(du.username)+')</td><td>'+esc(auditActionLabel(e.action))+'</td><td>'+esc(e.screen||"—")+'</td><td class="num">'+esc(e.docNo||"—")+'</td><td>'+esc(e.summary||"")+'</td></tr>';
     });
     h+='</table>';
   }
@@ -1297,12 +1365,22 @@ function createUser(username,password,fullName,role,phone,permissions){
   if(!username||!password)return {error:"اسم المستخدم وكلمة المرور مطلوبان."};
   if(!ROLES[role])return {error:"اختر دوراً صحيحاً."};
   if(findLocalUser(username))return {error:"اسم المستخدم «"+username+"» موجود من قبل."};
-  var u={id:uid("u"),username:username,password:password,fullName:String(fullName||"").trim()||username,role:role,phone:String(phone||"").trim(),permissions:Array.isArray(permissions)?permissions.slice():(ROLE_SCREENS[role]||[]).slice(),companyId:COMPANY_ID,active:true,createdAt:nowISO()};
+  var u={id:uid("u"),username:username,password:password,fullName:String(fullName||"").trim()||username,role:role,phone:String(phone||"").trim(),permissions:Array.isArray(permissions)?permissions.slice():(ROLE_SCREENS[role]||[]).slice(),companyId:COMPANY_ID,active:true,rev:1,createdAt:nowISO()};
   state.users.push(u);logAudit("create_user","إنشاء مستخدم جديد: "+u.username+" ("+u.fullName+") — الدور: "+roleName(u.role),u.username,"المستخدمون");save();return {user:u};
 }
 function updateUser(userId,fields){
   var u=userById(userId);if(!u)return {error:"المستخدم غير موجود."};
   if(fields.username&&String(fields.username).trim()!==u.username&&findLocalUser(fields.username))return {error:"اسم المستخدم الجديد موجود من قبل."};
+  /* مدير النظام «1» هو مسؤول النظام دائماً: لا يُغيَّر دوره ولا تُقيَّد
+     صلاحياته — يملك كل الصلاحيات بلا استثناء. */
+  if(u.username==="1"){
+    if(fields.username&&String(fields.username).trim()!=="1")return {error:"لا يمكن تغيير اسم مدير النظام «1»."};
+    if(fields.role&&fields.role!=="admin")return {error:"لا يمكن تغيير دور مدير النظام «1» — هو مسؤول النظام دائماً."};
+    if(fields.active===false)return {error:"لا يمكن إيقاف مدير النظام «1» — يجب أن يبقى حساب مسؤول النظام نشطاً دائماً."};
+    fields.role="admin";
+    fields.permissions=["dashboard","projects","tasks","quotations","approvals","materials","returns","contracts","financial","accounts","reports","audit","users","employees","notifications","settings","items"];
+  }
+  var pwChanged=!!fields.password&&String(fields.password)!==String(u.password);
   if(fields.username)u.username=String(fields.username).trim();
   if(fields.fullName!==undefined)u.fullName=String(fields.fullName).trim();
   if(fields.role&&ROLES[fields.role])u.role=fields.role;
@@ -1316,11 +1394,15 @@ function updateUser(userId,fields){
       if(JSON.stringify(oldPerms)!==JSON.stringify(u.permissions))logAudit("update_permissions","تغيير صلاحيات المستخدم "+u.username+" — الشاشات المسموحة الآن: "+u.permissions.map(function(s){return SCREEN_TITLES[s]||s;}).join("، "),u.username,"المستخدمون");
     }else if(fields.permissions===null)u.permissions=null;
   }
-  logAudit("update_user","تعديل المستخدم "+u.username+" ("+u.fullName+")",u.username,"المستخدمون");save();return {user:u};
+  /* أي تعديل على المستخدم يرفع رقم نسخته (rev) فيُبطل جلساته الحالية
+     فوراً: الرمز القديم لا يفتح الحساب، والصلاحيات/الدور القديمة لا
+     تبقى سارية — يعيد الدخول بالبيانات الجديدة. */
+  u.rev=(Number(u.rev)||1)+1;
+  logAudit("update_user","تعديل المستخدم "+u.username+" ("+u.fullName+")"+(pwChanged?" — تغيّرت كلمة المرور (القديمة لم تعد تعمل)":""),u.username,"المستخدمون");save();return {user:u};
 }
 function deleteUser(userId){
   var u=userById(userId);if(!u)return {error:"المستخدم غير موجود."};
-  if(u.username==="1")return {error:"لا يمكن حذف المدير العام."};
+  if(u.username==="1")return {error:"لا يمكن حذف مدير النظام."};
   if(state.assignments.some(function(a){return String(a.technicianId)===String(userId);}))return {error:"لا يمكن حذف هذا المستخدم — لديه مهام مسندة."};
   state.users=state.users.filter(function(x){return String(x.id)!==String(userId);});
   logAudit("delete_user","حذف المستخدم "+u.username+" ("+u.fullName+")",u.username,"المستخدمون");save();return {ok:true};
@@ -1330,7 +1412,7 @@ function deleteUser(userId){
 /* ---------- العرض ---------- */
 function togglePw(){var p=$("loginPass");if(!p)return;p.type=(p.type==="password")?"text":"password";}
 function loginKey(e,which){if(e&&e.key==="Enter"){e.preventDefault();if(which==="user"){var p=$("loginPass");if(p)p.focus();}else{doLogin();}}}
-function render(){var app=$("app");if(!app)return;if(!state.user){renderLogin();}else{renderApp();}syncSetBadge();}
+function render(){var app=$("app");if(!app)return;if(state.user)validateSession();if(!state.user){renderLogin();}else{renderApp();}syncSetBadge();}
 function renderLogin(){
   $("app").innerHTML=
   '<div class="login-wrap"><div class="login-card">'+
@@ -1344,10 +1426,14 @@ function renderLogin(){
   '<div class="pw-wrap"><input id="loginPass" type="password" class="inp" autocomplete="current-password" placeholder="كلمة المرور" onkeydown="loginKey(event,\'pass\')">'+
   '<button type="button" class="eye" onclick="togglePw()" title="إظهار / إخفاء كلمة المرور">👁</button></div>'+
   '<div style="margin-top:1rem"><button type="button" class="btn btn-navy" onclick="doLogin()">دخول</button></div>'+
-  '<p class="muted" style="margin-top:1rem;line-height:1.7">الدخول الأول للمدير العام: اسم المستخدم <b class="num">1</b> وكلمة المرور <b class="num">1</b>. لا يوجد تسجيل من هذه الشاشة — إنشاء المستخدمين يتم من داخل النظام بواسطة المدير العام فقط.</p>'+
+  '<p class="muted" style="margin-top:1rem;line-height:1.7">الدخول الأول لمدير النظام: اسم المستخدم <b class="num">1</b> وكلمة المرور <b class="num">1</b>. لا يوجد تسجيل من هذه الشاشة — إنشاء المستخدمين يتم من داخل النظام بواسطة مدير النظام فقط.</p>'+
   '<p id="loginModeNote" class="muted" style="line-height:1.7"></p>'+
   '</div></div>';
   syncNote();
+  /* رسالة الخروج الإجباري (تعديل على الحساب) تُعرض مرة واحدة على
+     شاشة الدخول ثم تُمسح. */
+  var sm=state.ui.sessionMsg;state.ui.sessionMsg=null;
+  if(sm){var le=$("loginErr");if(le){le.textContent=sm;le.classList.remove("hidden");}}
   var u=$("loginUser");if(u)try{u.focus();}catch(e){}
 }
 function navHtml(){
@@ -1434,13 +1520,13 @@ function clientOptions(sel){
 }
 function projectRowActions(p){
   var h='';
-  if(state.user&&(state.user.role==="projects_manager"||state.user.role==="gm")){
+  if(state.user&&(state.user.role==="projects_manager"||state.user.role==="gm"||state.user.role==="admin")){
     if(p.status==="new"||p.status==="assigned")h+='<button type="button" class="btn btn-ghost btn-sm" onclick="showAssign(\''+p.id+'\')">إسناد فنيين</button> ';
     if(p.status==="inspected")h+='<button type="button" class="btn btn-ghost btn-sm" onclick="goScreen(\'quotations\')">عمل عرض سعر</button> ';
     if(p.status==="inspected"||p.status==="inspection_rejected")h+='<button type="button" class="btn btn-ghost btn-sm" onclick="showInspect(\''+p.id+'\')">قرار المعاينة</button> ';
   }
   h+='<button type="button" class="btn btn-ghost btn-sm" onclick="showProject(\''+p.id+'\')">التفاصيل</button> ';
-  if(state.user&&(state.user.role==="projects_manager"||state.user.role==="gm"))h+='<button type="button" class="btn btn-danger btn-sm" onclick="delProject(\''+p.id+'\')">حذف</button>';
+  if(state.user&&(state.user.role==="projects_manager"||state.user.role==="gm"||state.user.role==="admin"))h+='<button type="button" class="btn btn-danger btn-sm" onclick="delProject(\''+p.id+'\')">حذف</button>';
   return h;
 }
 function screenProjects(){
@@ -1990,7 +2076,7 @@ function editOpening(cid){
   if(r.error){alert(r.error);return;}
   render();
 }
-/* ---------- المستخدمون (المدير العام فقط) ---------- */
+/* ---------- المستخدمون (مدير النظام فقط) ---------- */
 function togglePwById(id){var p=$(id);if(!p)return;p.type=(p.type==="password")?"text":"password";}
 /* صلاحيات نموذج المستخدمين: تُهيأ عند فتح النموذج (صلاحيات المستخدم
    نفسه عند التعديل، أو افتراضي الدور عند الإضافة)، وتُملأ تلقائياً
@@ -2012,14 +2098,14 @@ function screenUsers(){
   var eu=state.ui.editUserId?userById(state.ui.editUserId):null;
   initUserPerms(eu);
   var permInit=state.ui.permInit||[];
-  var h='<div class="card"><h2>المستخدمون</h2><p class="muted">إنشاء المستخدمين فقط من داخل النظام وبواسطة المدير العام — لا يوجد تسجيل من شاشة الدخول.</p><div id="usrMsg"></div>'+
+  var h='<div class="card"><h2>المستخدمون</h2><p class="muted">إنشاء المستخدمين فقط من داخل النظام وبواسطة مدير النظام — لا يوجد تسجيل من شاشة الدخول. مدير النظام (1/1) يملك كل الصلاحيات دائماً ولا يُغيَّر دوره، والمدير العام تُمنح صلاحياته من هنا (افتراضياً: اعتماد العروض والتقارير فقط).</p><div id="usrMsg"></div>'+
   '<h3>'+(eu?"تعديل المستخدم «"+esc(eu.username)+"»":"إضافة مستخدم جديد")+'</h3><div class="form-grid">'+
-  '<div><label>اسم المستخدم *</label><input id="nuUser" class="inp" value="'+(eu?esc(eu.username):"")+'"'+(eu&&eu.username==="1"?" disabled":"")+'>'+(eu&&eu.username==="1"?'<p class="muted">اسم المدير العام «1» لا يُغيَّر.</p>':"")+'</div>'+
+  '<div><label>اسم المستخدم *</label><input id="nuUser" class="inp" value="'+(eu?esc(eu.username):"")+'"'+(eu&&eu.username==="1"?" disabled":"")+'>'+(eu&&eu.username==="1"?'<p class="muted">اسم مدير النظام «1» لا يُغيَّر.</p>':"")+'</div>'+
   '<div><label>كلمة المرور *</label><div class="pw-wrap"><input id="nuPass" type="password" class="inp" value="'+(eu?esc(eu.password||""):"")+'"><button type="button" class="eye" onclick="togglePwById(\'nuPass\')" title="إظهار / إخفاء كلمة المرور">👁</button></div></div>'+
   '<div><label>الاسم الكامل</label><input id="nuName" class="inp" value="'+(eu?esc(eu.fullName||""):"")+'"></div>'+
   '<div><label>رقم الجوال (لإشعار واتساب عند الإسناد)</label><input id="nuPhone" class="inp" dir="ltr" value="'+(eu?esc(eu.phone||""):"")+'" placeholder="05xxxxxxxx"></div>'+
-  '<div><label>الدور *</label><select id="nuRole" class="inp" onchange="applyRolePerms(this.value)">'+Object.keys(ROLES).map(function(k){return '<option value="'+k+'"'+(eu&&eu.role===k?" selected":"")+'>'+esc(ROLES[k].name)+'</option>';}).join("")+'</select></div>'+
-  '<h3 style="grid-column:1/-1">صلاحيات المستخدم</h3><p class="muted" style="grid-column:1/-1">تُملأ تلقائياً حسب الدور عند تغييره، وتبقى قابلة للتعديل. شاشة «التقارير الرقابية» للمدير العام فقط ولا تظهر هنا.</p>'+
+  '<div><label>الدور *</label><select id="nuRole" class="inp" onchange="applyRolePerms(this.value)"'+(eu&&eu.username==="1"?" disabled":"")+'>'+Object.keys(ROLES).map(function(k){return '<option value="'+k+'"'+((eu?eu.role===k:k==="gm")?" selected":"")+'>'+esc(ROLES[k].name)+'</option>';}).join("")+'</select>'+(eu&&eu.username==="1"?'<p class="muted">دور مدير النظام «1» لا يُغيَّر.</p>':"")+'</div>'+
+  '<h3 style="grid-column:1/-1">صلاحيات المستخدم</h3><p class="muted" style="grid-column:1/-1">تُملأ تلقائياً حسب الدور عند تغييره، وتبقى قابلة للتعديل من مدير النظام. شاشة «التقارير الرقابية» لا تُمنح إلا صراحةً من هنا — والمدير العام لا يملكها افتراضياً. أي تعديل على المستخدم (رمز/دور/صلاحيات) يسري فوراً: يُبطل جلسته الحالية ويعيد الدخول بالبيانات الجديدة.</p>'+
   PERM_SCREENS.map(function(s){return '<label style="display:block;font-weight:400"><input type="checkbox" class="nuPerm" value="'+s+'"'+(permInit.indexOf(s)>=0?" checked":"")+'> '+esc(SCREEN_TITLES[s])+'</label>';}).join("")+
   '</div>'+
   '<div class="row" style="margin-top:.6rem"><button type="button" class="btn btn-navy" onclick="doCreateUser()">'+(eu?"حفظ التعديل":"إضافة مستخدم")+'</button>'+
@@ -2028,7 +2114,7 @@ function screenUsers(){
   state.users.forEach(function(u){
     h+='<tr><td class="num">'+esc(u.username)+'</td><td>'+esc(u.fullName||"")+'</td><td>'+esc(roleName(u.role))+'</td><td>'+(u.active===false?'<span class="badge b-rejected">موقوف</span>':'<span class="badge b-approved">نشط</span>')+'</td><td>'+
     '<button type="button" class="btn btn-ghost btn-sm" onclick="showEditUser(\''+u.id+'\')">تعديل</button> '+
-    '<button type="button" class="btn btn-ghost btn-sm" onclick="toggleUser(\''+u.id+'\')">'+(u.active===false?"تفعيل":"إيقاف")+'</button> '+
+    (u.username!=="1"?'<button type="button" class="btn btn-ghost btn-sm" onclick="toggleUser(\''+u.id+'\')">'+(u.active===false?"تفعيل":"إيقاف")+'</button> ':"")+
     '<button type="button" class="btn btn-ghost btn-sm" onclick="resetUserPw(\''+u.id+'\')">إعادة تعيين كلمة المرور</button> '+
     (u.username!=="1"?'<button type="button" class="btn btn-danger btn-sm" onclick="delUser(\''+u.id+'\')">حذف</button>':"")+
     '</td></tr>';
@@ -2404,7 +2490,10 @@ window.MSHRY={
   sendTechnicianWhatsApp:sendTechnicianWhatsApp,doWaTechnician:doWaTechnician,
   qMaintState:qMaintState,qMaintToggle:qMaintToggle,qMaintField:qMaintField,
   userScreens:userScreens,canSee:canSee,closeItemPicker:closeItemPicker,closeItemSuggest:closeItemSuggest,
-  openItemPicker:openItemPicker,pickItem:pickItem,applyRolePerms:applyRolePerms
+  openItemPicker:openItemPicker,pickItem:pickItem,applyRolePerms:applyRolePerms,
+  validateSession:validateSession,forceLogout:forceLogout,ensureAdminUser:ensureAdminUser,
+  auditDisplayUser:auditDisplayUser,ROLE_SCREENS:ROLE_SCREENS,PERM_SCREENS:PERM_SCREENS,
+  SCREEN_TITLES:SCREEN_TITLES,isGM:isGM,isAccounts:isAccounts
 };
 boot();
 </script>
