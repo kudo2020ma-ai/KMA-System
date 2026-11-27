@@ -24,6 +24,13 @@ module.exports = async function handler(req, res) {
   if (!auth) return; // requireAuth أرسل 401 بنفسه
   const companyId = auth.companyId || lib.DEFAULT_COMPANY_ID;
 
+  // إبطال الجلسة عند تعديل المستخدم: إن تغيّر rev في سجل المستخدم بعد
+  // إصدار هذا التوكن (تغيير رمز/دور/صلاحيات) يُرفض التوكن بـ 401
+  // حتى يعيد المستخدم الدخول بالبيانات الجديدة.
+  if (await lib.isTokenRevoked(auth)) {
+    return lib.sendJson(res, 401, { error: 'انتهت الجلسة — أُجري تعديل على حسابك، سجّل الدخول مجدداً' });
+  }
+
   try {
     // في وضع local-json على Vercel لا يوجد تخزين دائم أصلاً (ملف المشروع
     // للقراءة فقط، وكل استدعاء قد يعمل على نسخة مختلفة)، فالكتابة هنا
