@@ -131,31 +131,6 @@ function requireAuth(req, res) {
   return decoded;
 }
 
-// هل أُبطل هذا التوكن بتعديل على المستخدم بعد إصداره؟
-// يُقارن rev في التوكن مع rev في سجل المستخدم الحالي؛ عند الاختلاف
-// يكون التوكن مبطلاً (تغيّرت كلمة المرور أو الدور أو الصلاحيات).
-// - لا سجل للمستخدم بعد (توكن التهيئة الأولى) → غير مبطل.
-// - خطأ في قاعدة البيانات → غير مبطل (فتح عند الخطأ حتى لا تُقفل
-//   البيانات كلها بعطل عابر؛ الإبطال الأساسي يفرضه النظام في الواجهة
-//   عبر validateSession عند كل عرض).
-async function isTokenRevoked(decoded) {
-  try {
-    if (!decoded || !decoded.username) return false;
-    const companyId = decoded.companyId || DEFAULT_COMPANY_ID;
-    let row = await getRecord(companyId, 'users', decoded.username);
-    if (!row) {
-      const all = await listRecords(companyId, 'users');
-      row = all.find((r) => r.data && r.data.username === decoded.username) || null;
-    }
-    if (!row || !row.data) return false;
-    const storedRev = Number(row.data.rev) || 1;
-    const tokenRev = Number(decoded.rev) || 1;
-    return storedRev !== tokenRev;
-  } catch (e) {
-    return false;
-  }
-}
-
 function isValidName(value) {
   return typeof value === 'string' && /^[A-Za-z0-9_\-]{1,64}$/.test(value);
 }
@@ -267,6 +242,31 @@ async function deleteRecord(companyId, collection, id) {
   const removed = kept.length !== records.length;
   if (removed) writeLocalDb(kept);
   return removed;
+}
+
+// هل أُبطل هذا التوكن بتعديل على المستخدم بعد إصداره؟
+// يُقارن rev في التوكن مع rev في سجل المستخدم الحالي؛ عند الاختلاف
+// يكون التوكن مبطلاً (تغيّرت كلمة المرور أو الدور أو الصلاحيات).
+// - لا سجل للمستخدم بعد (توكن التهيئة الأولى) → غير مبطل.
+// - خطأ في قاعدة البيانات → غير مبطل (فتح عند الخطأ حتى لا تُقفل
+//   البيانات كلها بعطل عابر؛ الإبطال الأساسي يفرضه النظام في الواجهة
+//   عبر validateSession عند كل عرض).
+async function isTokenRevoked(decoded) {
+  try {
+    if (!decoded || !decoded.username) return false;
+    const companyId = decoded.companyId || DEFAULT_COMPANY_ID;
+    let row = await getRecord(companyId, 'users', decoded.username);
+    if (!row) {
+      const all = await listRecords(companyId, 'users');
+      row = all.find((r) => r.data && r.data.username === decoded.username) || null;
+    }
+    if (!row || !row.data) return false;
+    const storedRev = Number(row.data.rev) || 1;
+    const tokenRev = Number(decoded.rev) || 1;
+    return storedRev !== tokenRev;
+  } catch (e) {
+    return false;
+  }
 }
 
 module.exports = {
