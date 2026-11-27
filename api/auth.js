@@ -27,6 +27,29 @@ function passwordMatches(stored, supplied) {
   return false;
 }
 
+// سجل التدقيق لعمليات الدخول (خادم): يُسجَّل كل دخول ناجح وفاشل في
+// مجموعة audit_log — أفضل جهد، فلا يعطّل الدخول أبداً عند فشل الكتابة.
+// (دخول الوضع المحلي يُسجَّل من الواجهة نفسها؛ أما هنا فيُسجَّل كل
+// محاولة تصل إلى الخادم، فيراها المدير من أي جهاز.)
+async function auditAuth(companyId, username, role, action, summary) {
+  try {
+    const id = 'al-' + Date.now().toString(36) + '-' + crypto.randomBytes(6).toString('hex');
+    await lib.upsertRecord(companyId, 'audit_log', id, {
+      id,
+      at: new Date().toISOString(),
+      username,
+      fullName: username,
+      role: role || '—',
+      action,
+      screen: 'الدخول',
+      docNo: '',
+      summary,
+    });
+  } catch (e) {
+    /* audit best-effort — never break login */
+  }
+}
+
 module.exports = async function handler(req, res) {
   lib.setCors(req, res);
   if (req.method === 'OPTIONS') return res.status(204).end();
@@ -44,6 +67,7 @@ module.exports = async function handler(req, res) {
   const password = String(body.password || '');
 
   if (!username || !password) {
+    if (username) await auditAuth(lib.DEFAULT_COMPANY_ID, username, '—', 'login_failed', 'محاولة دخول فاشلة — بيانات ناقصة');
     return lib.sendJson(res, 400, { error: 'اسم المستخدم وكلمة المرور مطلوبان' });
   }
 
@@ -63,8 +87,10 @@ module.exports = async function handler(req, res) {
         username,
         fullName: record.data.fullName || username,
         role: record.data.role || 'user',
+        rev: Number(record.data.rev) || 1,
       };
       const userCompanyId = record.data.companyId || companyId;
+      await auditAuth(userCompanyId, username, user.role, 'login_success', 'تسجيل دخول ناجح للمستخدم ' + username);
       return lib.sendJson(res, 200, {
         token: lib.createToken(user, userCompanyId),
         user,
@@ -83,8 +109,9 @@ module.exports = async function handler(req, res) {
     try {
       const existing = await lib.listRecords(lib.DEFAULT_COMPANY_ID, 'users');
       if (existing.length === 0) {
-        const user = { username: '1', fullName: 'المدير', role: 'admin' };
+        const user = { username: '1', fullName: 'مدير النظام', role: 'admin', rev: 1 };
         const companyId = lib.DEFAULT_COMPANY_ID;
+        await auditAuth(companyId, username, 'admin', 'login_success', 'تسجيل دخول ناجح للمستخدم 1 (تهيئة أول مرة)');
         return lib.sendJson(res, 200, {
           token: lib.createToken(user, companyId),
           user,
@@ -96,5 +123,6 @@ module.exports = async function handler(req, res) {
     }
   }
 
+  await auditAuth(lib.DEFAULT_COMPANY_ID, username, '—', 'login_failed', 'محاولة دخول فاشلة للمستخدم ' + username + ' — بيانات غير صحيحة');
   return lib.sendJson(res, 401, { error: 'بيانات الدخول غير صحيحة' });
 };
