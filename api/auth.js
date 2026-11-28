@@ -1,36 +1,28 @@
-// POST /api/auth — تسجيل الدخول.
+// POST /api/auth — تسجيل الدخول (v2).
 // الطلب:  { "username": "...", "password": "..." }
-// النجاح: { "token": "...", "user": { "username", "fullName", "role" }, "companyId": "..." }
+// النجاح: { "token": "...", "user": { "username", "fullName", "role", "permissions", "userId" }, "companyId": "..." }
 // الفشل:  401 { "error": "بيانات الدخول غير صحيحة" }
+// القفل:  423 بعد 5 محاولات فاشلة متتالية لنفس المستخدم خلال 15 دقيقة.
 //
-// - الدخول الافتراضي للمدير 1/1 يعمل فقط عند عدم وجود أي مستخدم في قاعدة
-//   البيانات إطلاقاً (تهيئة أول مرة)؛ بعد زرع المدير تُقارن كلمة المرور المخزنة فقط.
-// - المستخدمون الآخرون يُقرأون من مجموعة "users" في قاعدة البيانات
-//   (سجل لكل مستخدم: id = اسم المستخدم، و data = { username, password, fullName, role }).
-//   يُنشئ المدير هؤلاء المستخدمين من داخل النظام (شاشة المستخدمين) فيحفظون
-//   في مجموعة users، فيعمل دخولهم فوراً من أي جهاز.
-// - التوكن JWT مبسّط بتوقيع HMAC-SHA256 بمفتاح JWT_SECRET من متغيرات البيئة.
+// - كلمات المرور تُقارن بصيغة scrypt فقط (passwordHash)؛ لا نص صريح
+//   ولا SHA-256 قديم؛ قاعدة البيانات فارغة وبداية جديدة.
+// - الدخول الافتراضي للمدير 1/1 يعمل فقط عند عدم وجود أي مستخدم في
+//   قاعدة البيانات إطلاقاً (تهيئة أول مرة): يُنشأ حينها سجل مدير النظام
+//   «1» في قاعدة البيانات بكلمة مرور مشفرة (passwordHash لكلمة «1»)
+//   ثم يُصدر التوكن. بعد ذلك لا يعمل 1/1 إلا إن كانت هي كلمة المرور
+//   الحالية فعلاً في السجل.
+// - بلا قاعدة بيانات (لا DATABASE_URL ولا وضع اختبار): 503.
+// - في الإنتاج (Postgres) لا نعمل بلا JWT_SECRET أبداً.
+// - التوكن JWT مبسّط بتوقيع HMAC-SHA256 بمفتاح JWT_SECRET.
 
 const crypto = require('crypto');
 const lib = require('./_lib');
 
-function sha256(value) {
-  return crypto.createHash('sha256').update(String(value)).digest('hex');
-}
-
-function passwordMatches(stored, supplied) {
-  if (stored === undefined || stored === null) return false;
-  // كلمة المرور قد تكون مخزّنة نصاً صريحاً (توافقاً مع النظام الحالي)
-  // أو بصيغة SHA-256 hex. نقبل الصيغتين.
-  if (String(stored) === String(supplied)) return true;
-  if (String(stored) === sha256(supplied)) return true;
-  return false;
-}
+const LOCKOUT_MAX_FAILURES = 5;
+const LOCKOUT_WINDOW_MS = 15 * 60 * 1000;
 
 // سجل التدقيق لعمليات الدخول (خادم): يُسجَّل كل دخول ناجح وفاشل في
 // مجموعة audit_log — أفضل جهد، فلا يعطّل الدخول أبداً عند فشل الكتابة.
-// (دخول الوضع المحلي يُسجَّل من الواجهة نفسها؛ أما هنا فيُسجَّل كل
-// محاولة تصل إلى الخادم، فيراها المدير من أي جهاز.)
 async function auditAuth(companyId, username, role, action, summary) {
   try {
     const id = 'al-' + Date.now().toString(36) + '-' + crypto.randomBytes(6).toString('hex');
@@ -38,15 +30,39 @@ async function auditAuth(companyId, username, role, action, summary) {
       id,
       at: new Date().toISOString(),
       username,
-      fullName: username,
+      userId: username,
       role: role || '—',
       action,
+      collection: 'users',
+      docId: username,
       screen: 'الدخول',
-      docNo: '',
       summary,
     });
   } catch (e) {
     /* audit best-effort — never break login */
+  }
+}
+
+// عدد محاولات الدخول الفاشلة المتتالية لنفس المستخدم خلال 15 دقيقة،
+// محسوبة من audit_log. عند أي فشل في العد نعيد -1 (غير معروف)
+// فيُسمح بالدخول ولا يُحجب.
+async function countRecentFailures(companyId, username) {
+  try {
+    const rows = await lib.listRecords(companyId, 'audit_log');
+    const since = Date.now() - LOCKOUT_WINDOW_MS;
+    const mine = rows
+      .filter((r) => r.data && r.data.username === username)
+      .sort((a, b) => String(b.data.at || '').localeCompare(String(a.data.at || '')));
+    let fails = 0;
+    for (const row of mine) {
+      const at = Date.parse(row.data.at || '');
+      if (!Number.isNaN(at) && at < since) break; // أقدم من النافذة
+      if (row.data.action === 'login_success') break; // نجاح يقطع التتالي
+      if (row.data.action === 'login_failed') fails += 1;
+    }
+    return fails;
+  } catch (e) {
+    return -1;
   }
 }
 
@@ -55,6 +71,13 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') {
     return lib.sendJson(res, 405, { error: 'الطريقة غير مدعومة — استخدم POST' });
+  }
+
+  // بلا قاعدة بيانات: لا دخول أصلاً (لا وضع محلي).
+  if (lib.getMode() === 'none') {
+    return lib.sendJson(res, 503, {
+      error: 'لا توجد قاعدة بيانات مربوطة — اربط Vercel Postgres بالمشروع ثم أعد النشر',
+    });
   }
 
   // في الإنتاج (Postgres) لا نعمل بلا JWT_SECRET أبداً.
@@ -71,31 +94,55 @@ module.exports = async function handler(req, res) {
     return lib.sendJson(res, 400, { error: 'اسم المستخدم وكلمة المرور مطلوبان' });
   }
 
+  const companyId = lib.DEFAULT_COMPANY_ID;
 
-  // 1) المستخدمون من مجموعة users في قاعدة البيانات — بما فيها حساب المدير "1"
-  //    إن وُجد؛ كلمة المرور تُقارن دائماً بالمخزنة، ولا يوجد أي تجاوز ثابت 1/1.
+  // قفل الحساب: 5 محاولات فاشلة متتالية خلال 15 دقيقة.
+  const recentFailures = await countRecentFailures(companyId, username);
+  if (recentFailures >= LOCKOUT_MAX_FAILURES) {
+    await auditAuth(companyId, username, '—', 'login_failed', 'محاولة دخول مرفوضة — الحساب مقفل مؤقتًا بعد 5 محاولات فاشلة');
+    return lib.sendJson(res, 423, {
+      error: 'الحساب مقفل مؤقتًا بعد 5 محاولات دخول فاشلة — أعد المحاولة بعد 15 دقيقة',
+    });
+  }
+
+  // 1) المستخدمون من مجموعة users في قاعدة البيانات — بما فيها حساب
+  //    المدير "1" إن وُجد؛ كلمة المرور تُقارن بالمخزنة المشفرة فقط
+  //    (scrypt)، ولا يوجد أي تجاوز ثابت 1/1.
   try {
-    const companyId = lib.DEFAULT_COMPANY_ID;
     const record =
       (await lib.getRecord(companyId, 'users', username)) ||
       (await lib.listRecords(companyId, 'users')).find(
         (r) => r.data && r.data.username === username
       );
 
-    if (record && record.data && passwordMatches(record.data.password, password)) {
-      const user = {
-        username,
-        fullName: record.data.fullName || username,
-        role: record.data.role || 'user',
-        rev: Number(record.data.rev) || 1,
-      };
-      const userCompanyId = record.data.companyId || companyId;
-      await auditAuth(userCompanyId, username, user.role, 'login_success', 'تسجيل دخول ناجح للمستخدم ' + username);
-      return lib.sendJson(res, 200, {
-        token: lib.createToken(user, userCompanyId),
-        user,
-        companyId: userCompanyId,
-      });
+    if (record && record.data) {
+      const data = record.data;
+      if (data.active === false) {
+        await auditAuth(companyId, username, data.role || '—', 'login_failed', 'محاولة دخول فاشلة للمستخدم ' + username + ' — الحساب موقوف');
+        return lib.sendJson(res, 401, { error: 'بيانات الدخول غير صحيحة' });
+      }
+      if (lib.verifyPassword(data.passwordHash, password)) {
+        const user = {
+          username,
+          fullName: data.fullName || username,
+          role: data.role || 'user',
+          permissions: Array.isArray(data.permissions) ? data.permissions.slice() : [],
+          userId: data.id || record.id || username,
+          rev: Number(data.rev) || 1,
+        };
+        await auditAuth(companyId, username, user.role, 'login_success', 'تسجيل دخول ناجح للمستخدم ' + username);
+        return lib.sendJson(res, 200, {
+          token: lib.createToken(user, companyId),
+          user: {
+            username: user.username,
+            fullName: user.fullName,
+            role: user.role,
+            permissions: user.permissions,
+            userId: user.userId,
+          },
+          companyId,
+        });
+      }
     }
   } catch (err) {
     console.error('auth lookup error:', err);
@@ -103,18 +150,44 @@ module.exports = async function handler(req, res) {
   }
 
   // 2) تهيئة أول مرة فقط: إن لم يوجد أي مستخدم في قاعدة البيانات إطلاقاً
-  //    يُسمح بالدخول 1/1 (يُزرع المدير بعدها من النظام ويُحفظ في القاعدة).
+  //    يُسمح بالدخول 1/1، ويُنشأ سجل مدير النظام «1» في قاعدة البيانات
+  //    بكلمة مرور مشفرة (passwordHash) قبل إصدار التوكن.
   //    إن وُجد أي مستخدم — ومنه حساب "1" بعد تغيير كلمة مروره — لا يعمل 1/1 أبداً.
   if (username === '1' && password === '1') {
     try {
-      const existing = await lib.listRecords(lib.DEFAULT_COMPANY_ID, 'users');
+      const existing = await lib.listRecords(companyId, 'users');
       if (existing.length === 0) {
-        const user = { username: '1', fullName: 'مدير النظام', role: 'admin', rev: 1 };
-        const companyId = lib.DEFAULT_COMPANY_ID;
+        const adminData = {
+          id: 'u-1',
+          username: '1',
+          passwordHash: lib.hashPassword('1'),
+          fullName: 'مدير النظام',
+          role: 'admin',
+          permissions: lib.FULL_PERMS.slice(),
+          phone: '',
+          active: true,
+          rev: 1,
+          companyId,
+        };
+        await lib.upsertRecord(companyId, 'users', 'u-1', adminData);
+        const user = {
+          username: '1',
+          fullName: 'مدير النظام',
+          role: 'admin',
+          permissions: lib.FULL_PERMS.slice(),
+          userId: 'u-1',
+          rev: 1,
+        };
         await auditAuth(companyId, username, 'admin', 'login_success', 'تسجيل دخول ناجح للمستخدم 1 (تهيئة أول مرة)');
         return lib.sendJson(res, 200, {
           token: lib.createToken(user, companyId),
-          user,
+          user: {
+            username: user.username,
+            fullName: user.fullName,
+            role: user.role,
+            permissions: user.permissions,
+            userId: user.userId,
+          },
           companyId,
         });
       }
@@ -123,6 +196,6 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  await auditAuth(lib.DEFAULT_COMPANY_ID, username, '—', 'login_failed', 'محاولة دخول فاشلة للمستخدم ' + username + ' — بيانات غير صحيحة');
+  await auditAuth(companyId, username, '—', 'login_failed', 'محاولة دخول فاشلة للمستخدم ' + username + ' — بيانات غير صحيحة');
   return lib.sendJson(res, 401, { error: 'بيانات الدخول غير صحيحة' });
 };
