@@ -44,7 +44,6 @@ header .brand{font-weight:800;font-size:1.1rem}
 header .brand span{color:var(--gold2)}
 .sync-badge{font-size:.82rem;border-radius:20px;padding:.25rem .7rem;background:#33475e;color:#dbe4ee}
 .sync-badge.sync-server{background:#1e7d32;color:#fff}
-.sync-badge.sync-local{background:#7a5b00;color:#fff}
 .sync-badge.sync-warn{background:#b3261e;color:#fff}
 .user-chip{font-size:.9rem}
 .user-chip button{margin-right:.5rem}
@@ -166,31 +165,24 @@ footer{text-align:center;color:var(--muted);font-size:.85rem;padding:1rem}
 <script>
 "use strict";
 /* ============================================================
-   نظام إدارة مشاريع المقاولات — واجهة موقع (ملف واحد)
-   قاعدة شركة واحدة: MSHRY_company (+ نسخة احتياطية واحدة
-   MSHRY_backup_company). تبدأ فارغة تماماً بلا بيانات تجريبية.
-   المزامنة: نفس عقد المزامنة المعتمد — GET /api/health (مهلة 3 ثوانٍ)،
-   وضع الخادم يفعّل فقط عند mode='postgres'.
-   *** فصل تام عن النظام السابق على المشروع نفسه: مفاتيح التخزين
-   المحلي هنا MSHRY_* و companyId هنا "mshry-default" — لا يقرأ
-   هذا الملف ولا يكتب أي مفتاح يخص النظام السابق، ولا يشير إلى
-   أي جدول خاص بنظام آخر. ***
+   نظام إدارة مشاريع المقاولات — نسخة الموقع v2 (ملف واحد)
+   خادم فقط — بلا أي تخزين على الجهاز إطلاقاً: لا تُقرأ بيانات العمل ولا
+   تُكتب إلا عبر /api/* على الخادم؛ localStorage يحمل التوكن
+   فقط (MSHRY_V2_TOKEN) ولا يحمل أي بيانات عمل. الخادم مرجع
+   وحيد؛ لا دمج (merge) إطلاقاً؛ الحذف نهائي عبر DELETE خادمي؛
+   سجل التدقيق يسجّله الخادم بنفسه (الواجهة تقرأ فقط).
+   القيود المحاسبية التلقائية (§5.2): مجموعة journal.
    ============================================================ */
-var COMPANY_KEY="MSHRY_company";
+var TOKEN_KEY="MSHRY_V2_TOKEN";
 var COMPANY_ID="mshry-default";
 var COMPANY_DEFAULTS={companyName:"شركة بصمة المشاعر المتطورة",companyNameEn:"BASSMAT ALMASHAEIR ADVANCED COMPANY",commercialReg:"4031264916",address:"المملكة العربية السعودية — العزيزية، شارع عبدالله الخياط",phones:"0555645215 - 0125124905",email:"bassmat.co@gmail.com"};
-var BKKEY="MSHRY_backup_company";
-var BKMETA="MSHRY_backup_meta_company";
-/* ---------- تصفير النظام: علامة التصفير (tombstone) ----------
-   RESET_KEY مفتاح محلي يحمل طابع زمني لآخر تصفير؛ وأي صف (محلي أو على
-   الخادم) أقدم منه هو بيانات ما قبل التصفير فيُسقط ولا يُدمج ولا يُدفع.
-   مجموعة الخادم reset_markers تحمل السجل الوحيد الباقي بعد التصفير. */
-var RESET_KEY="MSHRY_reset_marker_company";
 var RESET_COLL="reset_markers";
 var RESET_ID="last-reset";
-var PURGE_COLLECTIONS=["users","clients","projects","assignments","media","quotations","approvals","contracts","material_issues","payments","notifications","material_returns","transactions","items","audit_log","employees","leaves"];
+/* دليل الحسابات المختصر (§5.1) — رموز افتراضية لربط الحسابات والقيود. */
+var ACCOUNT_DEFAULTS={cash:"1100",unbilledReceivable:"1250",inventory:"1300",wip:"1350",vatOut:"2200",unbilledRevenue:"2250",revenueProjects:"4100",revenueContracts:"4200",materialCost:"5100"};
+var ACCOUNT_NAMES={"1100":"الصندوق والبنوك","1200":"العملاء (المدينون)","1210":"محتجزات لدى العملاء","1250":"مديونية عميل غير مفوترة","1300":"المخزون","1350":"عمل تحت التنفيذ","1500":"الأصول الثابتة","1600":"ضريبة القيمة المضافة – مدخلات","2100":"الموردون (الدائنون)","2200":"ضريبة القيمة المضافة – مخرجات","2250":"إيرادات غير مفوترة (مؤجلة)","2300":"دفعات مقدمة من العملاء","2400":"رواتب وعمولات مستحقة","3000":"رأس المال","4100":"إيرادات المشاريع والتركيب","4200":"إيرادات العقود","5100":"تكلفة المواد المصروفة","5200":"أجور الفنيين المباشرة","5300":"تكاليف مشاريع أخرى","6000":"المصروفات الإدارية والعمومية","6050":"عمولات المندوبين"};
 var ADMIN_USER="1";
-var COLLECTIONS=["users","clients","projects","assignments","media","quotations","approvals","contracts","material_issues","payments","notifications","settings","counters","material_returns","transactions","items","audit_log"];
+var COLLECTIONS=["users","clients","projects","assignments","media","quotations","approvals","contracts","material_issues","payments","notifications","settings","counters","material_returns","transactions","items","journal","employees","leaves","audit_log","reset_markers"];
 var PROJECT_TYPES=["تركيب كاميرات","صيانة","توريد أدوات سلامة","مضخات","أخرى"];
 var CONTRACT_TYPES=["صيانة","كاميرات","نظافة","مكافحة حشرات"];
 /* الأدوار: «مدير النظام» (admin) مسؤول النظام وصاحب كل الصلاحيات،
@@ -246,66 +238,22 @@ function companyInfo(){var s=state.settings[0]||{};var o={};var k;for(k in COMPA
 function fmtDateTime(s){if(!s)return "—";var t=String(s);return t.slice(0,10)+" "+t.slice(11,19);}
 </script>
 <script>
-/* ---------- الحالة والتخزين المحلي ---------- */
+/* ---------- الحالة في الذاكرة فقط ---------- */
 function defState(){return {
   users:[],clients:[],projects:[],assignments:[],media:[],quotations:[],
   approvals:[],contracts:[],material_issues:[],payments:[],notifications:[],
-  material_returns:[],transactions:[],items:[],audit_log:[],
-  settings:[{id:"main",companyName:"شركة بصمة المشاعر المتطورة",companyNameEn:"BASSMAT ALMASHAEIR ADVANCED COMPANY",commercialReg:"4031264916",address:"المملكة العربية السعودية — العزيزية، شارع عبدالله الخياط",phones:"0555645215 - 0125124905",email:"bassmat.co@gmail.com",currency:"ر.س",vatRate:15,setupCode:"1805",bankBalance:0,safeBalance:0,ownerName:"",ownerPhone:"",taxNumber:"",city:"",district:"",street:"",buildingNo:"",postalCode:"",subNumber:""}],
-  counters:[{id:"main",project:0,quotation:0,contract:0,payment:0,client:0,"return":0,transaction:0,item:0}],
+  material_returns:[],transactions:[],items:[],journal:[],audit_log:[],reset_markers:[],
+  settings:[{id:"main",companyName:"شركة بصمة المشاعر المتطورة",companyNameEn:"BASSMAT ALMASHAEIR ADVANCED COMPANY",commercialReg:"4031264916",address:"المملكة العربية السعودية — العزيزية، شارع عبدالله الخياط",phones:"0555645215 - 0125124905",email:"bassmat.co@gmail.com",currency:"ر.س",vatRate:15,setupCode:"1805",accountLinks:{cash:"1100",unbilledReceivable:"1250",inventory:"1300",wip:"1350",vatOut:"2200",unbilledRevenue:"2250",revenueProjects:"4100",revenueContracts:"4200",materialCost:"5100"},bankBalance:0,safeBalance:0,ownerName:"",ownerPhone:"",taxNumber:"",city:"",district:"",street:"",buildingNo:"",postalCode:"",subNumber:""}],
+  counters:[{id:"main",project:0,quotation:0,contract:0,payment:0,client:0,"return":0,transaction:0,item:0,journal:0}],
   employees:[],leaves:[]
 };}
 /* طابع الصف الزمني: أحدث حقل زمني متاح فيه. */
-function rowTime(r){if(!r||typeof r!=="object")return null;return r.updatedAt||r.createdAt||r.at||r.notifiedAt||null;}
-function getResetMarker(){try{var raw=localStorage.getItem(RESET_KEY);if(!raw)return null;var m=JSON.parse(raw);if(m&&m.at)return {at:String(m.at),by:m.by||"1"};}catch(e){}return null;}
-function setResetMarker(m){try{localStorage.setItem(RESET_KEY,JSON.stringify({at:String(m.at),by:m.by||"1"}));}catch(e){}}
-/* يسقط من كائن حالة كل صف أقدم من طابع التصفير، ويعيد الإعدادات
-   والعدادات إلى الافتراضيات إن كانت أقدم منه (أو بلا طابع) مختومة
-   بطابع التصفير نفسه حتى تنجو من حراس الدمج والدفع. الصفوف بلا أي
-   طابع زمني تُسقط أيضاً — كل صفوف ما بعد التصفير تحمل طابعاً. */
-function purgeStaleRows(st,at){
-  var changed=false;
-  PURGE_COLLECTIONS.forEach(function(c){
-    if(!Array.isArray(st[c]))return;
-    var kept=st[c].filter(function(row){
-      if(!row||typeof row!=="object")return false;
-      var t=rowTime(row);
-      return !!t&&String(t)>=String(at);
-    });
-    if(kept.length!==st[c].length){st[c]=kept;changed=true;}
-  });
-  if(Array.isArray(st.reset_markers)){
-    var kept2=st.reset_markers.filter(function(r){return r&&r.at&&String(r.at)>=String(at);});
-    if(kept2.length!==st.reset_markers.length){st.reset_markers=kept2;changed=true;}
-  }
-  return changed;
-}
-function applyResetMarkerTo(st,at){
-  if(!at)return false;
-  var changed=purgeStaleRows(st,at);
-  /* الإعدادات والعدادات مفردتان بلا طوابع أصلاً؛ إن كانتا أقدم من
-     التصفير (أو بلا طابع) أُعيدتا إلى الافتراضيات مختومتين بطابعه،
-     وإن كانتا أحدث منه (تعديل بعد التصفير) تُركتا كما هما. */
-  var d=defState();
-  if(!Array.isArray(st.settings)||!st.settings.length||!((st.settings[0].updatedAt||"")>=at)){
-    st.settings=[d.settings[0]];st.settings[0].updatedAt=at;changed=true;
-  }
-  if(!Array.isArray(st.counters)||!st.counters.length||!((st.counters[0].updatedAt||"")>=at)){
-    st.counters=[d.counters[0]];st.counters[0].updatedAt=at;changed=true;
-  }
-  return changed;
-}
-function loadState(){
-  var raw=null;
-  try{raw=localStorage.getItem(COMPANY_KEY);}catch(e){}
-  var mk=getResetMarker();
-  if(raw){try{var s=JSON.parse(raw);if(s&&s.settings){var d=normalizeState(s);if(mk&&mk.at)applyResetMarkerTo(d,mk.at);return d;}}catch(e){}}
-  /* بعد التصفير لا تُبعث النسخة الاحتياطية المحلية من جديد: نسخة ما قبل
-     التصفير قد تحمل بيانات أقدم من علامته فتُعيد الممسوح. */
-  if(mk&&mk.at)return defState();
-  try{var bk=localStorage.getItem(BKKEY);if(bk){var s2=JSON.parse(bk);if(s2&&s2.settings){try{localStorage.setItem(COMPANY_KEY,bk);}catch(e){}return normalizeState(s2);}}}catch(e){}
-  return defState();
-}
+/* ---------- الحالة: ذاكرة فقط — لا قراءة ولا كتابة على الجهاز إطلاقاً ----------
+   loadState تبدأ بحالة فارغة في الذاكرة؛ كل البيانات تأتي من الخادم
+   عبر pullAllFromServer بعد دخول ناجح. لا توجد نسخة على الجهاز ولا نسخة
+   احتياطية على الجهاز ولا علامة تصفير على الجهاز. */
+function loadState(){return defState();}
+function stripUserSecrets(r){if(r&&typeof r==="object"){delete r.password;delete r.passwordHash;}return r;}
 function normalizeState(s){
   var d=defState();
   COLLECTIONS.forEach(function(c){if(Array.isArray(s[c]))d[c]=s[c];});
@@ -317,46 +265,81 @@ function normalizeState(s){
   if(Array.isArray(d.settings)&&d.settings.length){
     var ds=defState().settings[0];
     Object.keys(ds).forEach(function(k){if(d.settings[0][k]===undefined)d.settings[0][k]=ds[k];});
+    if(!d.settings[0].accountLinks)d.settings[0].accountLinks={};var _alk;for(_alk in ACCOUNT_DEFAULTS)if(!d.settings[0].accountLinks[_alk])d.settings[0].accountLinks[_alk]=ACCOUNT_DEFAULTS[_alk];
   }
   d.clients.forEach(function(c){if(c.taxNumber===undefined)c.taxNumber="";});
   if(!Array.isArray(d.items))d.items=[];
   /* رقم نسخة الجلسة (rev): كل مستخدم له رقم نسخة يزيد عند أي تعديل
      عليه؛ السجلات القديمة بلا rev تُعامل كنسخة 1. */
   d.users.forEach(function(u){if(u&&(typeof u.rev!=="number"||isNaN(u.rev)))u.rev=1;});
+  d.users.forEach(function(u){stripUserSecrets(u);});
+  if(!Array.isArray(d.journal))d.journal=[];
+  if(!Array.isArray(d.reset_markers))d.reset_markers=[];
   return d;
 }
 var state=loadState();
 state.user=null;state.screen="dashboard";state.ui={};
-function defaultAdminUser(){return {id:"u-1",username:"1",password:"1",fullName:"مدير النظام",role:"admin",phone:"",permissions:FULL_PERMS.slice(),companyId:COMPANY_ID,active:true,rev:1,createdAt:nowISO()};}
-function ensureAdminUser(){
-  if(!Array.isArray(state.users))state.users=[];
-  var found=null;
-  for(var i=0;i<state.users.length;i++){if(state.users[i]&&state.users[i].username==="1"){found=state.users[i];break;}}
-  if(!found){found=defaultAdminUser();state.users.unshift(found);return found;}
-  /* إصلاح ذاتي لا يمكن تجاوزه (فكّ الحبس): حساب «1» هو مدير النظام
-     دائماً — مهما حُفظ عليه سابقاً (دور آخر كالحسابات أو المدير العام،
-     أو صلاحيات مخفّضة، أو اسم مختلف، أو إيقاف)، يُستعاد عند كل تشغيل
-     (محلياً وبعد المزامنة من الخادم) إلى: دور admin، والاسم الكامل
-     «مدير النظام»، وكل الصلاحيات (17/17)، والحساب مفعّل. أي إصلاح
-     يرفع rev فيُبطل الجلسات القديمة (فيعيد مدير النظام الدخول
-     بالصلاحيات الكاملة)، ويُسجَّل طابع updatedAt حتى يفوز السجل
-     المُصلح في دمج المزامنة على نسخة الخادم المخفّضة. كلمة المرور
-     لا تُمسّ إطلاقاً — لا تُستعاد ولا تُغيَّر. */
-  var changed=false;
-  if(found.role!=="admin"){found.role="admin";changed=true;}
-  if(found.fullName!=="مدير النظام"){found.fullName="مدير النظام";changed=true;}
-  if(found.active===false){found.active=true;changed=true;}
-  if(!Array.isArray(found.permissions)||found.permissions.length!==FULL_PERMS.length||FULL_PERMS.some(function(s){return found.permissions.indexOf(s)<0;})){found.permissions=FULL_PERMS.slice();changed=true;}
-  if(changed){found.rev=(Number(found.rev)||1)+1;found.updatedAt=nowISO();}
-  if(typeof found.rev!=="number"||isNaN(found.rev))found.rev=1;
-  return found;
+/* ---------- الحفظ الخادمي فقط (لا دمج إطلاقاً) ----------
+   pendingDeletes: حذف نهائي — كل سجل يُحذف من الحالة يُسجَّل هنا مع
+   نسخة منه، وتنفّذ save() الـ DELETE الخادمي قبل حفظ السجلات؛ عند
+   فشل الحذف يُعاد السجل للذاكرة ويُبلَّغ المستخدم ولا يُحذف من العرض.
+   lastSaved: لقطة JSON لكل مجموعة بعد آخر حفظ/سحب ناجح؛ تُرسل فقط
+   المجموعات التي تغيّرت، ولكل مجموعة سجلاتها الحالية كاملة.
+   pendingUserPasswords: كلمة مرور عابرة تُرسل مرة واحدة مع حفظ
+   الإنشاء/التغيير فقط — لا تُحفظ في الحالة ولا في التخزين إطلاقاً. */
+var pendingDeletes=[];
+var pendingUserPasswords={};
+var lastSaved={};
+var saveChain=Promise.resolve();
+var RESET_IN_PROGRESS=false;
+var RESET_DONE_MSG=null;
+function queueDelete(coll,record){if(!record||record.id===undefined)return;pendingDeletes.push({collection:coll,id:String(record.id),record:JSON.parse(JSON.stringify(record))});}
+function save(){
+  if(!SYNC||!SYNC.token)return Promise.resolve(false);
+  function run(){
+    var dels=pendingDeletes.splice(0,pendingDeletes.length);
+    var chain=Promise.resolve();
+    dels.forEach(function(d){
+      chain=chain.then(function(){return apiDelete(d.collection,d.id);}).catch(function(e){
+        if(e&&/401/.test(String(e.message||"")))return null;
+        var arr=state[d.collection];
+        if(Array.isArray(arr)&&!arr.some(function(x){return String(x.id)===String(d.id);}))arr.push(d.record);
+        if(typeof alert==="function")alert("تعذّر حذف السجل من الخادم — أُعيد للعرض. تحقق من الاتصال وحاول مجدداً.");
+        try{render();}catch(err){}
+        return null;
+      });
+    });
+    return chain.then(function(){
+      var jobs=[];
+      SAVE_COLLECTIONS.forEach(function(coll){
+        var rows=state[coll]||[];
+        var snap=JSON.stringify(rows);
+        if(lastSaved[coll]===snap)return;
+        lastSaved[coll]=snap;
+        rows.forEach(function(row){
+          if(!row||row.id===undefined)return;
+          var data=row;
+          if(coll==="users"&&pendingUserPasswords[String(row.id)]){
+            data={};var k;for(k in row)if(Object.prototype.hasOwnProperty.call(row,k))data[k]=row[k];
+            data.password=pendingUserPasswords[String(row.id)];
+            delete pendingUserPasswords[String(row.id)];
+          }
+          jobs.push(apiPost(coll,String(row.id),data));
+        });
+      });
+      if(!jobs.length)return true;
+      return Promise.all(jobs.map(function(p){return p.then(function(){return true;}).catch(function(){return false;});})).then(function(res){
+        var failed=0;res.forEach(function(ok){if(!ok)failed++;});
+        SYNC.pushFailed=failed;SYNC.serverHealthy=failed===0;syncSetBadge();
+        if(failed>0)SAVE_COLLECTIONS.forEach(function(c){delete lastSaved[c];});
+        return failed===0;
+      });
+    });
+  }
+  saveChain=saveChain.then(run,run);
+  return saveChain;
 }
-/* يُزرع المدير 1/1 فقط عند غياب حساب "1" تماماً. إن وُجد — حتى بعد تغيير
-   كلمة مروره أو إيقافه — لا يُمسّ إطلاقاً. */
-ensureAdminUser();saveLocal();
-function saveLocal(){var _mk=getResetMarker();if(_mk&&_mk.at)applyResetMarkerTo(state,_mk.at);try{var j=JSON.stringify(state);localStorage.setItem(COMPANY_KEY,j);localStorage.setItem(BKKEY,j);localStorage.setItem(BKMETA,new Date().toISOString());}catch(e){}}
-function save(){saveLocal();scheduleSyncPush();}
-function counters(){if(!state.counters||!state.counters.length)state.counters=[{id:"main",project:0,quotation:0,contract:0,payment:0,client:0,"return":0,transaction:0,item:0}];return state.counters[0];}
+function counters(){if(!state.counters||!state.counters.length)state.counters=[{id:"main",project:0,quotation:0,contract:0,payment:0,client:0,"return":0,transaction:0,item:0,journal:0}];return state.counters[0];}
 function nextSerial(kind,prefix){
   var c=counters();c[kind]=(Number(c[kind])||0)+1;c.updatedAt=nowISO();
   var n=prefix+"-"+String(c[kind]).padStart(4,"0");
@@ -372,36 +355,35 @@ function isSerialUsed(kind,num){
 function peekSerial(kind,prefix){var c=counters();return prefix+"-"+String((Number(c[kind])||0)+1).padStart(4,"0");}
 
 /* ---------- المزامنة مع قاعدة الخادم (العقد المعتمد نفسه) ---------- */
-var SYNC={mode:"local",token:null,companyId:null,busy:false,lastSync:null,checked:false,serverMode:null,serverHealthy:true,pushFailed:0,resetAt:null};
-var SYNC_COLLECTIONS=[["users","users"],["clients","clients"],["projects","projects"],["assignments","assignments"],["media","media"],["quotations","quotations"],["approvals","approvals"],["contracts","contracts"],["material_issues","material_issues"],["payments","payments"],["notifications","notifications"],["settings","settings"],["counters","counters"],["material_returns","material_returns"],["transactions","transactions"],["items","items"],["audit_log","audit_log"],["reset_markers","reset_markers"]];
-var SYNC_PUSH_TIMER=null;
+var SYNC={mode:"server",token:null,companyId:null,busy:false,lastSync:null,checked:false,serverHealthy:true,pushFailed:0};
+var SYNC_COLLECTIONS=[["users","users"],["clients","clients"],["projects","projects"],["assignments","assignments"],["media","media"],["quotations","quotations"],["approvals","approvals"],["contracts","contracts"],["material_issues","material_issues"],["payments","payments"],["notifications","notifications"],["settings","settings"],["counters","counters"],["material_returns","material_returns"],["transactions","transactions"],["items","items"],["journal","journal"],["employees","employees"],["leaves","leaves"],["audit_log","audit_log"],["reset_markers","reset_markers"]];
+/* مجموعات الحفظ: كل المجموعات عدا audit_log (يسجّله الخادم بنفسه ولا
+   يُرسل من الواجهة إطلاقاً) و reset_markers (يكتبها التصفير مباشرة). */
+var SAVE_COLLECTIONS=["users","clients","projects","assignments","media","quotations","approvals","contracts","material_issues","payments","notifications","settings","counters","material_returns","transactions","items","journal","employees","leaves"];
 function syncHeaders(){var h={"Content-Type":"application/json"};if(SYNC.token)h["Authorization"]="Bearer "+SYNC.token;return h;}
 function syncSetBadge(){
   var b=$("syncBadge");if(!b)return;
-  if(SYNC.mode==="server"&&SYNC.serverHealthy&&SYNC.pushFailed===0){b.className="sync-badge sync-server";b.textContent="متصل بالخادم — بيانات الشركة مشتركة";}
-  else if(SYNC.mode==="server"&&SYNC.pushFailed>0){b.className="sync-badge sync-warn";b.textContent="تحذير: تعذّر حفظ آخر "+SYNC.pushFailed+" عملية على الخادم — البيانات محفوظة على هذا الجهاز وستُعاد المحاولة";}
-  else if(SYNC.mode==="server"){b.className="sync-badge sync-server";b.textContent="الخادم متصل لكن الحفظ عليه تعذّر — البيانات محفوظة على هذا الجهاز فقط";}
-  else if(SYNC.serverMode==="local-json"){b.className="sync-badge sync-local";b.textContent="قاعدة الخادم غير متصلة بعد، البيانات على هذا الجهاز فقط";}
-  else{b.className="sync-badge sync-local";b.textContent="وضع محلي — البيانات على هذا الجهاز فقط";}
+  if(SYNC.pushFailed>0){b.className="sync-badge sync-warn";b.textContent="تحذير: تعذّر حفظ آخر عملية على الخادم — تحقق من الاتصال وحاول مجدداً";}
+  else if(!SYNC.serverHealthy){b.className="sync-badge sync-warn";b.textContent="تعذّر الاتصال بالخادم";}
+  else{b.className="sync-badge sync-server";b.textContent="متصل بالخادم — بيانات الشركة مشتركة";}
 }
 function syncNote(){
   var n=$("loginModeNote");if(!n)return;
-  if(SYNC.mode==="server"){n.textContent="متصل بالخادم: بيانات الشركة محفوظة مركزياً في قاعدة البيانات الواحدة المشتركة، وتظهر على جميع الأجهزة بعد الدخول بنفس الحساب. إنشاء المستخدمين يكون من داخل النظام عبر شاشة المستخدمين وبواسطة مدير النظام أو الحسابات.";}
-  else if(SYNC.serverMode==="local-json"){n.textContent="تنبيه: قاعدة بيانات الخادم المشتركة غير متصلة بعد — الخادم يعمل بوضع التخزين المحلي المؤقت الذي لا يحفظ بين الطلبات، فالبيانات محفوظة على هذا الجهاز فقط الآن ولن تظهر على جهاز آخر. إنشاء المستخدمين يكون من داخل النظام عبر شاشة المستخدمين وبواسطة مدير النظام أو الحسابات.";}
-  else{n.textContent="إنشاء المستخدمين يكون من داخل النظام عبر شاشة المستخدمين وبواسطة مدير النظام أو الحسابات — لا يوجد تسجيل من شاشة الدخول.";}
+  if(SYNC.checked&&!SYNC.serverHealthy){n.textContent="تعذّر الاتصال بالخادم — تحقق من الإنترنت وحاول مجدداً.";}
+  else{n.textContent="متصل بالخادم: بيانات الشركة محفوظة مركزياً في قاعدة البيانات الواحدة المشتركة، وتظهر على جميع الأجهزة بعد الدخول بنفس الحساب. إنشاء المستخدمين يكون من داخل النظام عبر شاشة المستخدمين وبواسطة مدير النظام أو الحسابات.";}
 }
 function syncCheck(){
-  if(typeof fetch!=="function"){SYNC.checked=true;syncSetBadge();return Promise.resolve(false);}
-  if(typeof location!=="undefined"&&location.protocol==="file:"){SYNC.checked=true;syncSetBadge();return Promise.resolve(false);}
+  if(typeof fetch!=="function"){SYNC.checked=true;syncSetBadge();syncNote();return Promise.resolve(false);}
   var ctl=null;try{ctl=new AbortController();}catch(e){ctl=null;}
   var to=null;if(ctl)to=setTimeout(function(){try{ctl.abort();}catch(e){}},3000);
   return fetch("/api/health",{cache:"no-store",signal:ctl?ctl.signal:undefined}).then(function(r){
     if(to)clearTimeout(to);if(!r.ok)throw new Error("health "+r.status);return r.json();
   }).then(function(j){
-    if(j&&j.ok){SYNC.serverMode=j.mode||null;if(j.mode==="postgres"){SYNC.mode="server";SYNC.serverHealthy=true;}else{SYNC.mode="local";}}
-    SYNC.checked=true;syncSetBadge();syncNote();return SYNC.mode==="server";
+    SYNC.checked=true;
+    SYNC.serverHealthy=!!(j&&j.ok);
+    syncSetBadge();syncNote();return SYNC.serverHealthy;
   }).catch(function(){
-    if(to)clearTimeout(to);SYNC.mode="local";SYNC.serverMode=null;SYNC.checked=true;syncSetBadge();syncNote();return false;
+    if(to)clearTimeout(to);SYNC.checked=true;SYNC.serverHealthy=false;syncSetBadge();syncNote();return false;
   });
 }
 function syncNormRows(rows){
@@ -413,152 +395,77 @@ function syncNormRows(rows){
     }return row;
   });
 }
-function apiGet(coll){return fetch("/api/data?collection="+encodeURIComponent(coll),{headers:syncHeaders(),cache:"no-store"}).then(function(r){if(!r.ok)throw new Error("get "+coll+" "+r.status);return r.json();}).then(function(j){if(Array.isArray(j))return syncNormRows(j);if(j&&Array.isArray(j.records))return syncNormRows(j.records);if(j&&Array.isArray(j.data))return syncNormRows(j.data);return [];});}
-function apiPost(coll,id,data){return fetch("/api/data",{method:"POST",headers:syncHeaders(),body:JSON.stringify({collection:coll,id:id,companyId:COMPANY_ID,data:data})}).then(function(r){if(!r.ok)throw new Error("post "+coll+" "+r.status);return r.json().catch(function(){return {};});});}
-function apiDel(coll,id){return fetch("/api/data?collection="+encodeURIComponent(coll)+"&id="+encodeURIComponent(id),{method:"DELETE",headers:syncHeaders()}).then(function(r){if(!r.ok)throw new Error("del "+coll+" "+r.status);return r.json().catch(function(){return {};});});}
-/* دمج آمن: اتحاد صفوف الخادم والمحلية حسب المعرّف (الخادم يفوز عند التعارض
-   بالأحدث updatedAt، وبلا طابع زمني يفوز الخادم)، ولا يُمحى أي صف محلي
-   أبداً لأن الخادم أعاد قائمة فارغة. */
-function syncMergeRows(localRows,serverRows){
-  var out=[];var seen={};
-  function key(r){return (r&&r.id!==undefined&&r.id!==null)?String(r.id):null;}
-  function upd(r){return (r&&r.updatedAt)?String(r.updatedAt):"";}
-  (serverRows||[]).forEach(function(row){if(!row)return;out.push(row);var k=key(row);if(k!==null)seen[k]=row;});
-  (localRows||[]).forEach(function(row){
-    if(!row)return;var k=key(row);
-    if(k===null||!seen[k]){out.push(row);return;}
-    var srv=seen[k];
-    if(upd(row)>upd(srv)){var ix=out.indexOf(srv);if(ix>=0)out[ix]=row;}
-  });
-  return out;
-}
-function syncPullFromServer(){
-  if(SYNC.mode!=="server"||!SYNC.token)return Promise.resolve(false);
-  SYNC.busy=true;
-  var jobs=SYNC_COLLECTIONS.map(function(pair){
-    return apiGet(pair[0]).then(function(rows){return {key:pair[1],rows:rows};}).catch(function(){return {key:pair[1],rows:null};});
-  });
-  return Promise.all(jobs).then(function(results){
-    var changed=false;var serverEmptyEverywhere=true;var localHasData=false;
-    /* علامة التصفير أولاً: أي صف أقدم منها (محلي أو خادم) هو بيانات ما
-       قبل التصفير — يُسقط قبل أي دمج، فلا يعود إلى المحلي ولا يُدفع. */
-    var resetAt=null;var resetBy="1";
-    results.forEach(function(res){
-      if(res&&res.key==="reset_markers"&&Array.isArray(res.rows)){
-        res.rows.forEach(function(r){if(r&&r.at&&(!resetAt||String(r.at)>String(resetAt))){resetAt=String(r.at);resetBy=r.by||"1";}});
-      }
-    });
-    if(resetAt){
-      SYNC.resetAt=resetAt;
-      if(applyResetMarkerTo(state,resetAt))changed=true;
-      var _mk=getResetMarker();
-      if(!_mk||_mk.at!==resetAt)setResetMarker({at:resetAt,by:resetBy});
+function apiGet(coll){return fetch("/api/data?collection="+encodeURIComponent(coll),{headers:syncHeaders(),cache:"no-store"}).then(function(r){
+  if(r.status===401){if(!RESET_IN_PROGRESS)forceLogout("انتهت الجلسة — سجّل الدخول مجدداً.");throw new Error("get "+coll+" 401");}
+  if(r.status===403)return [];
+  if(!r.ok)throw new Error("get "+coll+" "+r.status);
+  return r.json();
+}).then(function(j){if(Array.isArray(j))return syncNormRows(j);if(j&&Array.isArray(j.records))return syncNormRows(j.records);if(j&&Array.isArray(j.data))return syncNormRows(j.data);return [];});}
+function apiPost(coll,id,data){return fetch("/api/data",{method:"POST",headers:syncHeaders(),body:JSON.stringify({collection:coll,id:id,companyId:COMPANY_ID,data:data})}).then(function(r){
+  if(r.status===401){if(!RESET_IN_PROGRESS)forceLogout("انتهت الجلسة — سجّل الدخول مجدداً.");throw new Error("post "+coll+" 401");}
+  if(!r.ok)throw new Error("post "+coll+" "+r.status);
+  return r.json().catch(function(){return {};});
+});}
+function apiDelete(coll,id){return fetch("/api/data?collection="+encodeURIComponent(coll)+"&id="+encodeURIComponent(id),{method:"DELETE",headers:syncHeaders()}).then(function(r){
+  if(r.status===401){if(!RESET_IN_PROGRESS)forceLogout("انتهت الجلسة — سجّل الدخول مجدداً.");throw new Error("del "+coll+" 401");}
+  if(!r.ok)throw new Error("del "+coll+" "+r.status);
+  return r.json().catch(function(){return {};});
+});}
+function pullCollection(coll){
+  return apiGet(coll).then(function(rows){
+    if(!Array.isArray(rows))rows=[];
+    if(coll==="users")rows.forEach(function(r){stripUserSecrets(r);});
+    if(coll==="settings"&&rows.length){
+      var d0=defState().settings[0];var k;for(k in d0)if(rows[0][k]===undefined)rows[0][k]=d0[k];
+      if(!rows[0].accountLinks)rows[0].accountLinks={};for(k in ACCOUNT_DEFAULTS)if(!rows[0].accountLinks[k])rows[0].accountLinks[k]=ACCOUNT_DEFAULTS[k];
     }
-    results.forEach(function(res){
-      if(!res||res.rows===null)return;
-      if(res.key==="reset_markers"){
-        var kept=(res.rows||[]).filter(function(r){return r&&r.at&&(!resetAt||String(r.at)>=String(resetAt));});
-        if(JSON.stringify(kept)!==JSON.stringify(state.reset_markers||[])){state.reset_markers=kept;changed=true;}
-        return; /* العلامة وحدها لا تعني أن الخادم فيه بيانات أعمال */
-      }
-      var rows=res.rows;
-      if(resetAt){
-        rows=rows.filter(function(r){
-          if(!r||typeof r!=="object")return false;
-          if(res.key==="settings"||res.key==="counters")return (r.updatedAt||"")>=resetAt;
-          var t=rowTime(r);return !!t&&String(t)>=resetAt;
-        });
-      }
-      if(rows.length)serverEmptyEverywhere=false;
-      var local=state[res.key]||[];
-      if(local.length)localHasData=true;
-      var merged=syncMergeRows(local,rows);
-      if(JSON.stringify(merged)!==JSON.stringify(local)){state[res.key]=merged;changed=true;}
-    });
-    /* الإصلاح الذاتي لحساب «1» بعد المزامنة: إن أصلح ensureAdminUser
-       السجل (أو زرعه لعدم وجوده) يُدفع فوراً إلى الخادم عبر save()
-       حتى لا تعيده مزامنة لاحقة إلى النسخة المخفّضة المحفوظة هناك؛
-       أما التغييرات العادية فتُحفظ محلياً فقط كما كانت. */
-    var admBefore=findLocalUser("1");
-    var admRevBefore=admBefore?Number(admBefore.rev||1):null;
-    ensureAdminUser();
-    var admAfter=findLocalUser("1");
-    var adminRepaired=!!(admAfter&&(admRevBefore===null||Number(admAfter.rev||1)!==admRevBefore));
-    if(adminRepaired){save();}
-    else if(changed){saveLocal();}
-    SYNC.lastSync=new Date().toISOString();SYNC.busy=false;syncSetBadge();
-    /* إن كان الخادم فارغاً تماماً والمحلي فيه بيانات: تُدفع البيانات المحلية إلى الخادم */
-    if(serverEmptyEverywhere&&localHasData){return syncPushNow().then(function(){return true;});}
-    return changed;
-  }).catch(function(){SYNC.busy=false;return false;});
-}
-function scheduleSyncPush(){
-  if(SYNC.mode!=="server"||!SYNC.token)return;
-  if(SYNC_PUSH_TIMER)return;
-  SYNC_PUSH_TIMER=setTimeout(function(){SYNC_PUSH_TIMER=null;syncPushNow();},800);
-}
-/* الدفع يعدّ الفشل ولا يبتلعه بصمت: إن فشل أي حفظ على الخادم تُعرض شارة
-   تحذير وتبقى البيانات محفوظة محلياً، وتُعاد المحاولة عند الحفظ التالي. */
-function syncPushNow(){
-  if(SYNC.mode!=="server"||!SYNC.token||SYNC.busy)return Promise.resolve(false);
-  SYNC.busy=true;var jobs=[];
-  SYNC_COLLECTIONS.forEach(function(pair){
-    var rows=state[pair[1]]||[];
-    rows.forEach(function(row){
-      if(!row||row.id===undefined)return;
-      /* حارس التصفير: لا يُدفع أي صف أقدم من علامة التصفير، ولا صف
-         بلا طابع (لا يمكن إثبات أنه بعدها) — فيمنع تبويب قديم من
-         إعادة بذر الخادم الفارغ ببيانات ما قبل التصفير. */
-      if(SYNC.resetAt){
-        if(pair[1]==="settings"||pair[1]==="counters"){if(!((row.updatedAt||"")>=SYNC.resetAt))return;}
-        else if(pair[1]==="reset_markers"){if(!(row.at&&String(row.at)>=SYNC.resetAt))return;}
-        else{var _t=rowTime(row);if(!_t||String(_t)<SYNC.resetAt)return;}
-      }
-      jobs.push(apiPost(pair[0],String(row.id),row).then(function(){return true;}).catch(function(){return false;}));
-    });
+    if((coll==="settings"||coll==="counters")&&!rows.length){lastSaved[coll]=JSON.stringify(state[coll]||[]);return state[coll]||[];}
+    /* مستخدم بلا صلاحية قراءة مجموعة users يرى [] (403) — لا نمسح
+       قائمته الحالية حتى لا يُطرد بجلسة سارية. */
+    if(coll==="users"&&!rows.length&&state.user){lastSaved[coll]=JSON.stringify(state[coll]||[]);return state[coll]||[];}
+    state[coll]=rows;
+    lastSaved[coll]=JSON.stringify(rows);
+    return rows;
   });
-  return Promise.all(jobs).then(function(res){
-    var failed=0;res.forEach(function(ok){if(!ok)failed++;});
-    SYNC.pushFailed=failed;SYNC.busy=false;
-    if(failed===0)SYNC.lastSync=new Date().toISOString();
-    else SYNC.serverHealthy=false;
-    syncSetBadge();return failed===0;
-  }).catch(function(){SYNC.pushFailed=1;SYNC.busy=false;syncSetBadge();return false;});
+}
+/* سحب كل المجموعات من الخادم — الخادم مرجع وحيد، بلا دمج إطلاقاً.
+   403 على مجموعة تُعامل كفارغة ولا تعطل السحب. */
+function pullAllFromServer(){
+  if(!SYNC.token)return Promise.reject(new Error("no token"));
+  SYNC.busy=true;
+  var jobs=SYNC_COLLECTIONS.map(function(pair){return pullCollection(pair[0]);});
+  return Promise.all(jobs).then(function(){SYNC.busy=false;SYNC.lastSync=new Date().toISOString();SYNC.serverHealthy=true;syncSetBadge();return true;}).catch(function(e){SYNC.busy=false;throw e;});
 }
 function syncRefresh(){
   var s=$("syncStatus");if(s)s.textContent="جارٍ التحديث من الخادم…";
-  syncPullFromServer().then(function(ok){
-    if(s)s.textContent=ok?"تم التحديث من الخادم.":"تعذّر التحديث من الخادم — البيانات المعروضة هي المحلية.";
-    render();
-  });
+  pullAllFromServer().then(function(){if(s)s.textContent="تم التحديث من الخادم.";render();}).catch(function(){if(s)s.textContent="تعذّر التحديث من الخادم — تحقق من الاتصال.";});
 }
-
 /* ---------- الدخول ---------- */
 function serverLogin(un,pw){
-  /* يُرسل companyId الخاص بهذا النظام ("mshry-default") مع طلب الدخول
-     حتى تعزل الواجهة الخلفية مستخدميه وبياناته عن أي نظام آخر على
-     المشروع نفسه؛ وسجلات المستخدمين نفسها تحمل companyId أيضاً. */
+  /* كلمة المرور تُرسل نصاً عبر HTTPS إلى /api/auth فقط؛ التشفير في الخادم. */
   return fetch("/api/auth",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:un,password:pw,companyId:COMPANY_ID})}).then(function(r){
-    if(!r.ok)throw new Error("auth "+r.status);return r.json();
+    if(r.status===401)throw new Error("auth 401");
+    if(!r.ok)throw new Error("auth "+r.status);
+    return r.json();
   }).then(function(j){
     if(!j||!j.token||!j.user)throw new Error("bad auth");
     SYNC.token=j.token;SYNC.companyId=j.companyId||null;
-    try{sessionStorage.setItem("MSHRY_sync_token",j.token);}catch(e){}
+    try{localStorage.setItem(TOKEN_KEY,j.token);}catch(e){}
     return j.user;
   });
 }
-function findLocalUser(un){
+function findUserByName(un){
   for(var i=0;i<state.users.length;i++){if(state.users[i]&&String(state.users[i].username)===String(un))return state.users[i];}
   return null;
 }
-/* دخول احتياطي محلي: عند فشل دخول الخادم يُقبل مستخدم موجود محلياً
-   بنفس كلمة المرور المخزنة محلياً. */
-function localLogin(un,pw){
-  var u=findLocalUser(un);
-  if(!u)return null;
-  if(u.active===false)return {error:"هذا الحساب موقوف — راجع مدير النظام."};
-  if(String(u.password)!==String(pw))return null;
-  return {username:u.username,fullName:u.fullName||u.username,role:u.role};
+function clearToken(){SYNC.token=null;try{localStorage.removeItem(TOKEN_KEY);}catch(e){}}
+function sessionUserFromToken(){
+  try{
+    var parts=String(SYNC.token||"").split(".");if(parts.length!==3)return null;
+    var b64=parts[1].replace(/-/g,"+").replace(/_/g,"/");
+    while(b64.length%4)b64+="=";
+    return JSON.parse(atob(b64))||null;
+  }catch(e){return null;}
 }
 function doLogin(){
   var un=($("loginUser")?$("loginUser").value:"").trim();
@@ -567,44 +474,41 @@ function doLogin(){
   function fail(msg){if(err){err.textContent=msg;err.classList.remove("hidden");}}
   if(!un||!pw){fail("أدخل اسم المستخدم وكلمة المرور.");return Promise.resolve(false);}
   function finish(userObj){
-    var u=findLocalUser(userObj.username);
-    if(!u){fail("بيانات الدخول غير صحيحة.");return false;}
+    var u=findUserByName(userObj.username);
+    if(!u){
+      /* إصلاح الدخول من جهاز جديد: مستخدم بلا صلاحية قراءة مجموعة
+         users لا يرى سجله في السحب — نبني سجله من رد الدخول نفسه. */
+      u={id:userObj.userId||userObj.id||uid("u"),username:userObj.username,fullName:userObj.fullName||userObj.username,role:userObj.role,permissions:Array.isArray(userObj.permissions)?userObj.permissions.slice():null,rev:Number(userObj.rev)||1,active:true,createdAt:nowISO()};
+      state.users.unshift(u);lastSaved.users=JSON.stringify(state.users);
+    }
     if(u.active===false){fail("هذا الحساب موقوف — راجع مدير النظام.");return false;}
     state.user={id:u.id,username:u.username,fullName:u.fullName||u.username,role:u.role,permissions:Array.isArray(u.permissions)?u.permissions.slice():null,rev:Number(u.rev)||1};
     state.ui.sessionMsg=null;
-    logAudit("login_success","تسجيل دخول ناجح للمستخدم "+u.username+" ("+roleName(u.role)+")","","الدخول");
     state.screen=(u.role==="technician")?"tasks":(u.role==="hr"?"employees":(u.role==="storekeeper"?"materials":(u.role==="secretariat"?"contracts":"dashboard")));
     if(err)err.classList.add("hidden");
-    saveLocal();
-    if(SYNC.mode==="server")syncPullFromServer().then(function(){render();});
     render();
     return true;
   }
-  if(SYNC.mode==="server"){
-    /* إصلاح دخول الأجهزة الجديدة: بعد نجاح دخول الخادم صار لدينا توكن،
-       فنسحب المستخدمين (وبقية البيانات) من الخادم أولاً — قبل التحقق
-       المحلي في finish() — لأن مستخدماً أُنشئ من جهاز آخر قد لا يكون
-       موجوداً في النسخة المحلية لهذا الجهاز، فكان الدخول يُرفض رغم
-       صحة بياناته. سحب ما قبل الدخول مستحيل لأنه بلا توكن. إن فشل
-       السحب يُحافَظ على السلوك السابق (finish بالنسخة المحلية). */
-    return serverLogin(un,pw).then(function(userObj){
-      return syncPullFromServer().then(function(){return finish(userObj);});
-    }).catch(function(){
-      var local=localLogin(un,pw);
-      if(local&&!local.error)return finish(local);
-      if(local&&local.error){fail(local.error);return false;}
-      fail("بيانات الدخول غير صحيحة.");return false;
+  return serverLogin(un,pw).then(function(userObj){
+    /* بعد نجاح دخول الخادم: اسحب كل المجموعات من الخادم قبل إتمام
+       الدخول — أي مستخدم مسجَّل يدخل من أي جهاز نظيف. */
+    return pullAllFromServer().then(function(){return finish(userObj);}).catch(function(e){
+      if(e&&/401/.test(String(e.message||""))){fail("انتهت الجلسة — سجّل الدخول مجدداً.");return false;}
+      fail("تعذّر الاتصال بالخادم — تحقق من الإنترنت وحاول مجدداً");
+      return false;
     });
-  }
-  var local2=localLogin(un,pw);
-  if(local2&&!local2.error)return Promise.resolve(finish(local2));
-  if(local2&&local2.error){logAudit("login_failed","محاولة دخول فاشلة للمستخدم "+un+" — "+local2.error,"","الدخول",{username:un,fullName:un,role:"—"});saveLocal();fail(local2.error);return Promise.resolve(false);}
-  logAudit("login_failed","محاولة دخول فاشلة للمستخدم "+un+" — بيانات غير صحيحة","","الدخول",{username:un,fullName:un,role:"—"});saveLocal();
-  fail("بيانات الدخول غير صحيحة.");return Promise.resolve(false);
+  }).catch(function(e){
+    var m=String((e&&e.message)||"");
+    if(/401|403/.test(m)){fail("بيانات الدخول غير صحيحة.");return false;}
+    fail("تعذّر الاتصال بالخادم — تحقق من الإنترنت وحاول مجدداً");
+    return false;
+  });
 }
 function logout(){
-  if(state.user){logAudit("logout","تسجيل خروج المستخدم "+(state.user.fullName||state.user.username)+" ("+state.user.username+")","","الدخول");saveLocal();if(SYNC.mode==="server"&&SYNC.token)syncPushNow();}
-  state.user=null;state.screen="dashboard";try{sessionStorage.removeItem("MSHRY_sync_token");}catch(e){}SYNC.token=null;render();
+  clearToken();
+  state=defState();state.user=null;state.screen="dashboard";state.ui={};
+  pendingDeletes=[];pendingUserPasswords={};lastSaved={};
+  render();
 }
 function currentUser(){return state.user;}
 function canSee(screen){var u=state.user;if(!u)return false;return userScreens(u).indexOf(screen)>=0;}
@@ -659,21 +563,18 @@ function auditDisplayUser(e){
 function auditRoleLabel(r){return r==="system"?"النظام":roleName(r);}
 function callerIsNonAdmin(){return !!(state.user&&state.user.role!=="admin");}
 function forceLogout(msg){
-  if(state.user){try{logAudit("logout","تسجيل خروج إجباري للمستخدم "+(state.user.fullName||state.user.username)+" ("+state.user.username+") — "+msg,"","الدخول");}catch(e){}}
-  state.user=null;state.screen="dashboard";state.ui.sessionMsg=msg;
-  try{sessionStorage.removeItem("MSHRY_sync_token");}catch(e){}SYNC.token=null;saveLocal();
+  clearToken();
+  state=defState();state.user=null;state.screen="dashboard";
+  state.ui={sessionMsg:msg||"انتهت الجلسة — سجّل الدخول مجدداً."};
+  pendingDeletes=[];pendingUserPasswords={};lastSaved={};
+  if(!_forceLogoutRendering){_forceLogoutRendering=true;try{render();}catch(e){}_forceLogoutRendering=false;}
 }
+var _forceLogoutRendering=false;
 function isAdminUser(){return !!(state.user&&state.user.role==="admin");}
-function logAudit(action,summary,docNo,screen,who){
-  var u=who||state.user;
-  /* userId يُحفظ مع كل حدث حتى يعرض سجل التدقيق الاسم الحالي للمستخدم
-     حتى بعد تغيير اسم المستخدم — أما username/fullName فيُحفظان
-     كنسخة تاريخية للحالات القديمة بلا userId. */
-  var e={id:uid("al"),at:nowISO(),userId:u?u.id:null,username:u?u.username:"—",fullName:u?(u.fullName||u.username):"النظام",role:u?u.role:"system",action:action,screen:screen||"",docNo:docNo||"",summary:String(summary||"")};
-  if(!Array.isArray(state.audit_log))state.audit_log=[];
-  state.audit_log.push(e);
-  return e;
-}
+/* سجل التدقيق: الخادم يسجّله بنفسه عند كل كتابة؛ الواجهة لا ترسل
+   أحداث تدقيق إطلاقاً — هذه الدالة معطّلة قصداً (تُبقي الاستدعاءات
+   القديمة بلا أثر)، وشاشة التقارير الرقابية تقرأ فقط. */
+function logAudit(){return null;}
 function userScreens(u){
   if(!u)return [];
   if(u.role==="admin")return Object.keys(SCREEN_TITLES);
@@ -873,6 +774,12 @@ function financialApprove(quotationId){
   }
   q.status="financial_approved";q.financialApprovedAt=nowISO();q.financialApprovedBy=state.user?state.user.username:"—";q.updatedAt=nowISO();
   var p=projectById(q.projectId);if(p){p.status="approved";p.updatedAt=nowISO();}
+  /* قيود §5.2 عند الاعتماد المالي (بعد اكتمال الصرف): قيدان —
+     (أ) بالتكلفة: مدين عمل تحت التنفيذ / دائن المخزون؛
+     (ب) بسعر البيع: مدين مديونية غير مفوترة / دائن إيرادات مؤجلة. */
+  var _jt=issuedTotals(q.id);var _alFin=accountLinks();
+  if(_jt.cost>0)postJournal("issue_cost","quotation",q.id,q.number,q.clientId,[{account:_alFin.wip,debit:_jt.cost,credit:0},{account:_alFin.inventory,debit:0,credit:_jt.cost}],"صرف مواد بالتكلفة — عرض "+q.number);
+  if(_jt.sale>0)postJournal("issue_sale","quotation",q.id,q.number,q.clientId,[{account:_alFin.unbilledReceivable,debit:_jt.sale,credit:0},{account:_alFin.unbilledRevenue,debit:0,credit:_jt.sale}],"صرف مواد بسعر البيع — عرض "+q.number);
   logAudit("financial_approve","الاعتماد المالي لعرض السعر "+q.number+" — تسجيل مديونية "+fmtM(q.total)+" على العميل",q.number,"الاعتماد المالي والمديونيات");save();
   notifyRole("accounts","تم الاعتماد المالي للعرض "+q.number,"سُجلت المديونية على العميل بقيمة "+fmtM(q.total)+".",{quotationId:q.id,projectId:q.projectId});
   return {quotation:q};
@@ -883,7 +790,10 @@ function recordPayment(clientId,kind,amount,note,quotationId,skipAudit){
   if(kind!=="advance"&&kind!=="payment")kind="payment";
   var c=counters();c.payment=(Number(c.payment)||0)+1;c.updatedAt=nowISO();
   var pay={id:uid("py"),docNo:"PY-"+String(c.payment).padStart(4,"0"),clientId:cl.id,quotationId:quotationId||null,kind:kind,amount:amount,note:String(note||"").trim(),date:today(),by:state.user?state.user.username:"—",createdAt:nowISO()};
-  state.payments.push(pay);if(!skipAudit)logAudit("record_payment","تسجيل "+(kind==="advance"?"دفعة مقدمة":"دفعة سداد")+" "+pay.docNo+" بمبلغ "+fmtM(amount)+" من العميل "+cl.name,pay.docNo,"الاعتماد المالي والمديونيات");save();return {payment:pay};
+  state.payments.push(pay);
+  /* قيد §5.2 عند تسجيل دفعة (سند قبض): مدين الصندوق/البنك / دائن مديونية غير مفوترة. */
+  var _alPay=accountLinks();postJournal("payment","payment",pay.id,pay.docNo,cl.id,[{account:_alPay.cash,debit:amount,credit:0},{account:_alPay.unbilledReceivable,debit:0,credit:amount}],"سند قبض "+pay.docNo+" — "+(kind==="advance"?"دفعة مقدمة":"دفعة سداد")+" من العميل "+cl.name);
+  if(!skipAudit)logAudit("record_payment","تسجيل "+(kind==="advance"?"دفعة مقدمة":"دفعة سداد")+" "+pay.docNo+" بمبلغ "+fmtM(amount)+" من العميل "+cl.name,pay.docNo,"الاعتماد المالي والمديونيات");save();return {payment:pay};
 }
 function setOpeningBalance(clientId,amount){
   var cl=clientById(clientId);if(!cl)return {error:"العميل غير موجود."};
@@ -930,6 +840,7 @@ function projectHasWork(projectId){
 function deleteProject(projectId){
   var p=projectById(projectId);if(!p)return {error:"المشروع غير موجود."};
   if(projectHasWork(projectId))return {error:"لا يمكن حذف المشروع "+p.number+" — تم العمل عليه (إسناد أو معاينة أو عرض سعر)."};
+  queueDelete("projects",p);
   state.projects=state.projects.filter(function(x){return String(x.id)!==String(projectId);});
   logAudit("delete_project","حذف المشروع "+p.number+" ("+p.title+")",p.number,"إدارة المشاريع");save();return {ok:true};
 }
@@ -943,8 +854,9 @@ function createUser(username,password,fullName,role,phone,permissions){
     if(role==="admin"){logAudit("create_user_denied","محاولة مرفوضة: المستخدم "+state.user.username+" حاول إنشاء المستخدم «"+username+"» بدور «مدير النظام» — التعيين لمدير النظام فقط.",username,"المستخدمون");save();return {error:"تعيين دور «مدير النظام» لمدير النظام فقط — لا يمكنك إنشاء مستخدم بهذا الدور."};}
     if(Array.isArray(permissions)&&permissions.indexOf("audit")>=0){logAudit("create_user_denied","محاولة مرفوضة: المستخدم "+state.user.username+" حاول منح المستخدم «"+username+"» صلاحية «التقارير الرقابية» — المنح لمدير النظام فقط.",username,"المستخدمون");save();return {error:"منح صلاحية «التقارير الرقابية» لمدير النظام فقط."};}
   }
-  if(findLocalUser(username))return {error:"اسم المستخدم «"+username+"» موجود من قبل."};
-  var u={id:uid("u"),username:username,password:password,fullName:String(fullName||"").trim()||username,role:role,phone:String(phone||"").trim(),permissions:Array.isArray(permissions)?permissions.slice():(ROLE_SCREENS[role]||[]).slice(),companyId:COMPANY_ID,active:true,rev:1,createdAt:nowISO()};
+  if(findUserByName(username))return {error:"اسم المستخدم «"+username+"» موجود من قبل."};
+  var u={id:uid("u"),username:username,fullName:String(fullName||"").trim()||username,role:role,phone:String(phone||"").trim(),permissions:Array.isArray(permissions)?permissions.slice():(ROLE_SCREENS[role]||[]).slice(),companyId:COMPANY_ID,active:true,rev:1,createdAt:nowISO()};
+  pendingUserPasswords[u.id]=password; /* تُرسل مرة واحدة مع حفظ الإنشاء — لا تُحفظ في الحالة إطلاقاً */
   state.users.push(u);logAudit("create_user","إنشاء مستخدم جديد: "+u.username+" ("+u.fullName+") — الدور: "+roleName(u.role),u.username,"المستخدمون");save();return {user:u};
 }
 function updateUser(userId,fields){
@@ -961,7 +873,7 @@ function updateUser(userId,fields){
     if(fields.role==="admin"){logAudit("update_user_denied","محاولة مرفوضة: المستخدم "+state.user.username+" حاول تعيين دور «مدير النظام» للمستخدم «"+u.username+"» — التعيين لمدير النظام فقط.",u.username,"المستخدمون");save();return {error:"تعيين دور «مدير النظام» لمدير النظام فقط."};}
     if(Array.isArray(fields.permissions)&&fields.permissions.indexOf("audit")>=0&&!(Array.isArray(u.permissions)&&u.permissions.indexOf("audit")>=0)){logAudit("update_user_denied","محاولة مرفوضة: المستخدم "+state.user.username+" حاول منح المستخدم «"+u.username+"» صلاحية «التقارير الرقابية» — المنح لمدير النظام فقط.",u.username,"المستخدمون");save();return {error:"منح صلاحية «التقارير الرقابية» لمدير النظام فقط."};}
   }
-  if(fields.username&&String(fields.username).trim()!==u.username&&findLocalUser(fields.username))return {error:"اسم المستخدم الجديد موجود من قبل."};
+  if(fields.username&&String(fields.username).trim()!==u.username&&findUserByName(fields.username))return {error:"اسم المستخدم الجديد موجود من قبل."};
   /* مدير النظام «1» هو مسؤول النظام دائماً: لا يُغيَّر دوره ولا تُقيَّد
      صلاحياته — يملك كل الصلاحيات بلا استثناء. */
   if(u.username==="1"){
@@ -971,11 +883,11 @@ function updateUser(userId,fields){
     fields.role="admin";
     fields.permissions=FULL_PERMS.slice();
   }
-  var pwChanged=!!fields.password&&String(fields.password)!==String(u.password);
+  var pwChanged=!!fields.password;
   if(fields.username)u.username=String(fields.username).trim();
   if(fields.fullName!==undefined)u.fullName=String(fields.fullName).trim();
   if(fields.role&&ROLES[fields.role])u.role=fields.role;
-  if(fields.password)u.password=String(fields.password);
+  if(fields.password)pendingUserPasswords[u.id]=String(fields.password); /* تُرسل مرة واحدة مع الحفظ — لا تُحفظ في الحالة إطلاقاً */
   if(fields.active!==undefined)u.active=!!fields.active;
   if(fields.phone!==undefined)u.phone=String(fields.phone||"").trim();
   if(fields.permissions!==undefined){
@@ -998,6 +910,7 @@ function deleteUser(userId){
   if(callerIsNonAdmin()){logAudit("delete_user_denied","محاولة حذف مرفوضة: المستخدم "+state.user.username+" حاول حذف المستخدم "+u.username+" ("+u.fullName+") — الحذف لمدير النظام فقط.",u.username,"المستخدمون");save();return {error:"حذف المستخدمين لمدير النظام فقط — لا يمكنك حذف هذا المستخدم."};}
   if(u.username==="1")return {error:"لا يمكن حذف مدير النظام."};
   if(state.assignments.some(function(a){return String(a.technicianId)===String(userId);}))return {error:"لا يمكن حذف هذا المستخدم — لديه مهام مسندة."};
+  queueDelete("users",u);
   state.users=state.users.filter(function(x){return String(x.id)!==String(userId);});
   logAudit("delete_user","حذف المستخدم "+u.username+" ("+u.fullName+")",u.username,"المستخدمون");save();return {ok:true};
 }
@@ -1122,11 +1035,16 @@ function createMaterialReturn(quotationId,itemName,qty,note){
   /* المرتجع يعيد الكمية إلى رصيد الصنف في المخزون إن كان مسجلاً. */
   var _rit=itemByName(itemName);
   if(_rit){_rit.qty=Number(_rit.qty||0)+qty;_rit.updatedAt=nowISO();}
+  /* قيد §5.2: المرتجع يعكس قيدي الصرف بنفس القيم — التكلفة وسعر البيع. */
+  var _alRet=accountLinks();var _cuRet=issueCostUnit(itemName,q);var _costRet=Math.round(qty*_cuRet*100)/100;ret.costAmount=_costRet;ret.costUnit=_cuRet;
+  if(_costRet>0)postJournal("return_cost","material_return",ret.id,ret.docNo,q.clientId,[{account:_alRet.inventory,debit:_costRet,credit:0},{account:_alRet.wip,debit:0,credit:_costRet}],"مرتجع مواد بالتكلفة — "+ret.docNo+" ("+itemName+" ×"+qty+")");
+  postJournal("return_sale","material_return",ret.id,ret.docNo,q.clientId,[{account:_alRet.unbilledRevenue,debit:ret.amount,credit:0},{account:_alRet.unbilledReceivable,debit:0,credit:ret.amount}],"مرتجع مواد بسعر البيع — "+ret.docNo+" ("+itemName+" ×"+qty+")");
   logAudit("create_return","مرتجع مواد "+ret.docNo+": "+itemName+" ×"+qty+" بقيمة "+fmtM(ret.amount)+" — تخفيض مديونية العميل",ret.docNo,"مرتجع المواد");save();return {ret:ret};
 }
 function deleteItem(itemId){
   var it=itemById(itemId);if(!it)return {error:"الصنف غير موجود."};
   if(itemHasMovements(it))return {error:"لا يمكن حذف الصنف «"+it.name+"» — توجد عليه حركات (بنود عروض أسعار أو صرف/مرتجع مواد). التعديل مسموح أما الحذف فممنوع."};
+  queueDelete("items",it);
   state.items=state.items.filter(function(x){return String(x.id)!==String(itemId);});
   logAudit("delete_item","حذف الصنف "+it.code+" — "+it.name,it.code,"الأصناف");save();return {ok:true};
 }
@@ -1362,6 +1280,84 @@ function saveSetupSettings(fields){
   s.updatedAt=nowISO();
   logAudit("save_setup","حفظ تهيئة النظام (بيانات الشركة والأرصدة الافتتاحية"+(fields.newCode?" وتغيير رمز التهيئة":"")+")","","الإعدادات");save();return {settings:s};
 }
+/* ---------- القيود المحاسبية التلقائية (§5.2) ----------
+   كل قيد مرتبط بمستنده (لا تكرار: kind+refId فريد)، ومتوازن دائماً.
+   ميزان المراجعة وكشف حساب العميل لا يتغيران — القيود سجل مكمل. */
+function accountLinks(){
+  var s=state.settings[0]||{};var o={};var k;
+  for(k in ACCOUNT_DEFAULTS)o[k]=ACCOUNT_DEFAULTS[k];
+  if(s.accountLinks)for(k in s.accountLinks)if(s.accountLinks[k])o[k]=String(s.accountLinks[k]);
+  return o;
+}
+function saveAccountLinks(fields){
+  var s=state.settings[0];if(!s){state.settings=[{id:"main"}];s=state.settings[0];}
+  if(!s.accountLinks)s.accountLinks={};
+  var k;for(k in fields)if(fields[k]!==undefined&&String(fields[k]).trim())s.accountLinks[k]=String(fields[k]).trim();
+  s.updatedAt=nowISO();save();return {links:accountLinks()};
+}
+function issueCostUnit(itemName,q){
+  var it=itemByName(itemName);
+  if(it&&Number(it.costPrice)>0)return Number(it.costPrice);
+  if(q)return quoteItemPrice(q,itemName);
+  return 0;
+}
+function issuedTotals(quotationId){
+  var q=quoteById(quotationId);var cost=0,sale=0;
+  state.material_issues.forEach(function(m){
+    if(String(m.quotationId)!==String(quotationId))return;
+    var qty=Number(m.qtyIssued)||0;if(qty<=0)return;
+    cost+=qty*issueCostUnit(m.itemName,q);
+    sale+=qty*quoteItemPrice(q,m.itemName);
+  });
+  return {cost:Math.round(cost*100)/100,sale:Math.round(sale*100)/100};
+}
+function journalExists(kind,refId){
+  return (state.journal||[]).some(function(j){return j.kind===kind&&String(j.refId)===String(refId);});
+}
+function postJournal(kind,refType,refId,refDocNo,clientId,lines,note){
+  if(!kind||!refId||!Array.isArray(lines)||!lines.length)return null;
+  if(journalExists(kind,refId))return null;
+  var totD=0,totC=0;
+  lines.forEach(function(l){totD+=Number(l.debit)||0;totC+=Number(l.credit)||0;});
+  totD=Math.round(totD*100)/100;totC=Math.round(totC*100)/100;
+  if(totD<=0||totD!==totC)return null;
+  var c=counters();c.journal=(Number(c.journal)||0)+1;c.updatedAt=nowISO();
+  var e={id:uid("jv"),docNo:"JV-"+String(c.journal).padStart(4,"0"),kind:kind,refType:refType,refId:String(refId),refDocNo:refDocNo||"",clientId:clientId||null,date:today(),lines:lines.map(function(l){return {account:String(l.account),name:ACCOUNT_NAMES[String(l.account)]||"",debit:Math.round((Number(l.debit)||0)*100)/100,credit:Math.round((Number(l.credit)||0)*100)/100};}),total:totD,note:String(note||""),createdAt:nowISO(),updatedAt:nowISO()};
+  if(!Array.isArray(state.journal))state.journal=[];
+  state.journal.push(e);
+  return e;
+}
+function journalEntries(){
+  return (state.journal||[]).slice().sort(function(a,b){return String(b.date||"").localeCompare(String(a.date||""))||String(b.createdAt||"").localeCompare(String(a.createdAt||""));});
+}
+function journalHtml(){
+  var rows=journalEntries();
+  var h='<div class="card"><h2>القيود المحاسبية التلقائية (§5.2)</h2><p class="muted">قيود تلقائية مرتبطة بمستنداتها: صرف المواد (بالتكلفة وبسعر البيع) عند الاعتماد المالي، وعكسها عند المرتجع، وسند القبض عند تسجيل الدفعة. هذا السجل مكمّل لميزان المراجعة وكشف حساب العميل ولا يغيّر حسابهما.</p>';
+  if(!rows.length){h+='<p class="muted">لا توجد قيود بعد — تُنشأ تلقائياً عند الاعتماد المالي لعرض أو تسجيل دفعة أو مرتجع.</p>';return h+'</div>';}
+  h+='<table><tr><th>رقم القيد</th><th>التاريخ</th><th>المستند المرتبط</th><th>البيان</th><th>الحساب المدين</th><th>الحساب الدائن</th><th>المبلغ</th></tr>';
+  rows.forEach(function(j){
+    var d=null,cr=null;
+    j.lines.forEach(function(l){if(Number(l.debit)>0)d=l;if(Number(l.credit)>0)cr=l;});
+    d=d||{};cr=cr||{};
+    h+='<tr><td class="num">'+esc(j.docNo)+'</td><td class="num">'+esc(j.date)+'</td><td class="num">'+esc(j.refDocNo||"—")+'</td><td>'+esc(j.note||"")+'</td><td>'+esc((d.account||"")+" — "+(d.name||""))+'</td><td>'+esc((cr.account||"")+" — "+(cr.name||""))+'</td><td class="num">'+fmtM(j.total)+'</td></tr>';
+  });
+  var tot=0;rows.forEach(function(j){tot+=Number(j.total)||0;});
+  h+='<tr style="background:#eef1f5;font-weight:700"><td colspan="6">إجمالي القيود</td><td class="num">'+fmtM(tot)+'</td></tr></table></div>';
+  return h;
+}
+function accountLinksHtml(){
+  var l=accountLinks();
+  var fields=[["cash","الصندوق والبنوك"],["unbilledReceivable","مديونية عميل غير مفوترة"],["inventory","المخزون"],["wip","عمل تحت التنفيذ"],["vatOut","ضريبة القيمة المضافة – مخرجات"],["unbilledRevenue","إيرادات غير مفوترة (مؤجلة)"],["revenueProjects","إيرادات المشاريع والتركيب"],["revenueContracts","إيرادات العقود"],["materialCost","تكلفة المواد المصروفة"]];
+  var h='<div class="panel"><h3>🔗 ربط الحسابات بدليل الحسابات (§5.1)</h3><p style="color:#bcd">رموز الحسابات المستخدمة في القيود التلقائية — عدّلها عند الحاجة ثم احفظ.</p><div id="accLinkMsg"></div><div class="form-grid">';
+  fields.forEach(function(f){h+='<div><label style="color:#fff">'+esc(f[1])+'</label><input id="al_'+f[0]+'" class="inp num" dir="ltr" value="'+esc(l[f[0]]||"")+'"></div>';});
+  h+='</div><div class="row" style="margin-top:.6rem"><button type="button" class="btn btn-gold" onclick="doSaveAccountLinks()">حفظ ربط الحسابات</button></div></div>';
+  return h;
+}
+function doSaveAccountLinks(){
+  var fields={};["cash","unbilledReceivable","inventory","wip","vatOut","unbilledRevenue","revenueProjects","revenueContracts","materialCost"].forEach(function(k){var el=$("al_"+k);if(el)fields[k]=el.value;});
+  saveAccountLinks(fields);render();
+  var m=$("accLinkMsg");if(m)m.innerHTML='<div class="okbox">تم حفظ ربط الحسابات.</div>';
+}
 function screenAudit(){
   var f=auditFilters();
   var rows=filterAudit();
@@ -1413,75 +1409,56 @@ function sendTechnicianWhatsApp(projectId,technicianId){
 }
 function setupCode(){var s=state.settings[0];return (s&&s.setupCode)?String(s.setupCode):"1805";}
 /* ---------- تصفير النظام (مدير النظام فقط، برمز التهيئة) ----------
-   الترتيب: (1) مسح الخادم عبر الـ API — كل المجموعات بما فيها سجل
-   التدقيق والإعدادات والعدادات — والمستخدمون أخيراً لأن مسحهم قد
-   يُبطل التوكن (401 بعدها نجاح متوقع)؛ (2) كتابة علامة التصفير على
-   الخادم (المجموعة reset_markers) وفي التخزين المحلي — هي ما يهزم
-   إعادة الرفع: أي صف أقدم منها يُسقط عند السحب والدفع والحفظ؛
-   (3) مسح المحلي (المفتاح الرئيسي + النسخة الاحتياطية + ميتا النسخة)
-   وإعادة الحالة إلى افتراضيات فارغة مع زرع حساب 1/1 من جديد عبر
-   ensureAdminUser، وتسجيل الخروج إلى شاشة الدخول. لا يمسّ أي جدول
-   آخر: الـ API يعمل على mshry_records فقط بـ companyId ثابت. */
+   خادمي بالكامل: مسح كل مجموعات الخادم عبر DELETE (المستخدمون أخيراً
+   لأن مسحهم قد يُبطل التوكن)، ثم كتابة سجل reset_markers، ثم إعادة
+   زرع حساب مدير النظام 1/1 على الخادم (أفضل جهد — إن رفض الخادم
+   الطلب بعد إبطال التوكن، يعيد الخادم زرع الحساب على قاعدة فارغة).
+   لا يُحفظ أي شيء على هذا الجهاز ولا يُعاد زرع أي حساب هنا. */
 function resetSystem(code){
   if(!state.user||state.user.role!=="admin"||state.user.username!=="1"){
-    logAudit("reset_unauthorized","محاولة تصفير مرفوضة: المستخدم «"+(state.user?state.user.username:"—")+"» ليس مدير النظام — التصفير لمدير النظام (الحساب 1) فقط.","","الإعدادات");
-    saveLocal();
     return Promise.resolve({error:"تصفير النظام لمدير النظام فقط (الحساب 1)."});
   }
   if(!checkSetupCode(code)){
-    logAudit("reset_denied","محاولة تصفير مرفوضة: رمز تهيئة غير صحيح — لم يُمسح أي شيء.","","الإعدادات");
-    saveLocal();
     return Promise.resolve({error:"رمز التهيئة غير صحيح — لم يتم مسح أي شيء."});
   }
   var at=new Date().toISOString();
   var by=state.user.username;
-  function wipeServer(){
-    if(!(SYNC.mode==="server"&&SYNC.token))return Promise.resolve({serverWiped:false,serverErrors:[]});
-    var order=[];
-    SYNC_COLLECTIONS.forEach(function(pair){if(pair[0]!=="users"&&pair[0]!=="reset_markers")order.push(pair[0]);});
-    order.push("reset_markers","users");
-    var errors=[];
-    var chain=Promise.resolve();
-    order.forEach(function(coll){
-      chain=chain.then(function(){
-        return apiGet(coll).then(function(rows){
-          var c2=Promise.resolve();
-          (rows||[]).forEach(function(r){
-            c2=c2.then(function(){
-              return apiDel(coll,String(r.id)).catch(function(e){
-                if(e&&/401/.test(String(e.message||"")))return; /* إبطال متوقع بعد مسح المستخدمين */
-                errors.push(coll+":"+r.id);
-              });
-            });
-          });
-          return c2;
-        }).catch(function(e){
-          if(e&&/401/.test(String(e.message||"")))return;
-          errors.push(coll+":list");
+  RESET_IN_PROGRESS=true;
+  var order=[];
+  SYNC_COLLECTIONS.forEach(function(pair){if(pair[0]!=="users"&&pair[0]!=="reset_markers")order.push(pair[0]);});
+  order.push("reset_markers","users");
+  var errors=[];
+  var chain=Promise.resolve();
+  order.forEach(function(coll){
+    chain=chain.then(function(){
+      return apiGet(coll).catch(function(){return [];}).then(function(rows){
+        var c2=Promise.resolve();
+        (rows||[]).forEach(function(r){
+          c2=c2.then(function(){return apiDelete(coll,String(r.id)).catch(function(){errors.push(coll+":"+r.id);});});
         });
+        return c2;
       });
     });
-    return chain.then(function(){
-      return apiPost("reset_markers","last-reset",{id:"last-reset",at:at,by:by,companyId:COMPANY_ID}).catch(function(){/* قد يُبطل مسح المستخدمين التوكن — العلامة المحلية تحمي هذا المتصفح */});
-    }).then(function(){return {serverWiped:true,serverErrors:errors};});
-  }
-  return wipeServer().then(function(srv){
-    try{localStorage.removeItem(COMPANY_KEY);localStorage.removeItem(BKKEY);localStorage.removeItem(BKMETA);}catch(e){}
-    try{sessionStorage.removeItem("MSHRY_sync_token");}catch(e){}
-    SYNC.token=null;SYNC.resetAt=at;SYNC.lastSync=null;SYNC.pushFailed=0;
-    setResetMarker({at:at,by:by});
-    state=defState();state.user=null;state.screen="dashboard";state.ui={resetDone:true,resetAt:at};
-    state.settings[0].updatedAt=at;state.counters[0].updatedAt=at;
-    ensureAdminUser();
-    /* سجل التدقيق فارغ قصداً بعد التصفير (المسح شمله)؛ وعلامة
-       التصفير على الخادم وفي المحلي هي سجل العملية نفسها. */
-    saveLocal();
-    return {ok:true,at:at,serverWiped:srv.serverWiped,serverErrors:srv.serverErrors};
+  });
+  return chain.then(function(){
+    return apiPost("reset_markers","last-reset",{id:"last-reset",at:at,by:by,companyId:COMPANY_ID}).catch(function(){});
+  }).then(function(){
+    return apiPost("users","u-1",{id:"u-1",username:"1",password:"1",fullName:"مدير النظام",role:"admin",phone:"",permissions:FULL_PERMS.slice(),companyId:COMPANY_ID,active:true,rev:1,createdAt:at}).catch(function(){});
+  }).then(function(){
+    RESET_IN_PROGRESS=false;
+    clearToken();
+    state=defState();state.user=null;state.screen="dashboard";state.ui={};
+    pendingDeletes=[];pendingUserPasswords={};lastSaved={};
+    RESET_DONE_MSG=at;
+    return {ok:true,at:at,serverWiped:true,serverErrors:errors};
+  }).catch(function(e){
+    RESET_IN_PROGRESS=false;
+    return {error:"تعذّر إتمام التصفير على الخادم — تحقق من الاتصال وحاول مجدداً."};
   });
 }
 function resetSettingsHtml(){
   var h='<div class="card" style="border:2px solid #b00020"><h3 style="color:#b00020">⚠ تصفير النظام</h3>'+
-  '<p class="warn">يمسح هذا الإجراء <b>جميع بيانات النظام نهائياً</b> من الخادم ومن هذا الجهاز ومن النسخة الاحتياطية المحلية: المستخدمون والعملاء والمشاريع والعروض والعقود والمواد والدفعات والإعدادات والعدادات وسجل التدقيق — ثم يعيد إنشاء حساب مدير النظام (1/1) تلقائياً في نظام فارغ. لا يمسّ أي نظام آخر، ولا يمكن التراجع بعد التأكيد.</p>';
+  '<p class="warn">يمسح هذا الإجراء <b>جميع بيانات النظام نهائياً</b> من الخادم: المستخدمون والعملاء والمشاريع والعروض والعقود والمواد والدفعات والإعدادات والعدادات وسجل التدقيق والقيود — ثم يعيد إنشاء حساب مدير النظام (1/1) على الخادم في نظام فارغ. لا يمسّ أي نظام آخر، ولا يمكن التراجع بعد التأكيد.</p>';
   if(state.ui.resetAsk){
     h+='<div id="resetErr"></div><div class="form-grid"><div><label>رمز التهيئة (للتأكيد)</label><div class="pw-wrap"><input id="resetCodeIn" type="password" class="inp" placeholder="أدخل رمز التهيئة"><button type="button" class="eye" onclick="togglePwById(\'resetCodeIn\')" title="إظهار / إخفاء الرمز">👁</button></div></div></div>'+
     '<div class="row" style="margin-top:.6rem"><button type="button" id="resetConfirmBtn" class="btn btn-navy" style="background:#b00020" onclick="doResetSystem()">تأكيد التصفير نهائياً — مسح كل شيء</button>'+
@@ -1573,7 +1550,7 @@ function renderLogin(){
      شاشة الدخول ثم تُمسح. */
   var sm=state.ui.sessionMsg;state.ui.sessionMsg=null;
   if(sm){var le=$("loginErr");if(le){le.textContent=sm;le.classList.remove("hidden");}}
-  var rd=null;try{rd=sessionStorage.getItem("MSHRY_reset_done");if(rd)sessionStorage.removeItem("MSHRY_reset_done");}catch(e){}
+  var rd=RESET_DONE_MSG;RESET_DONE_MSG=null;
   if(rd){var lo=$("loginOk");if(lo){lo.innerHTML='<div class="okbox">تم تصفير النظام بنجاح — النظام الآن فارغ تماماً. سجّل الدخول بحساب مدير النظام (1/1) للبدء من جديد.</div>';lo.classList.remove("hidden");}}
   var u=$("loginUser");if(u)try{u.focus();}catch(e){}
 }
@@ -1583,7 +1560,14 @@ function navHtml(){
   screens.forEach(function(s){if(canSee(s))h+='<button type="button" class="'+(state.screen===s?"on":"")+'" onclick="goScreen(\''+s+'\')">'+esc(SCREEN_TITLES[s])+'</button>';});
   return '<nav class="tabs">'+h+'</nav>';
 }
-function goScreen(s){if(!canSee(s))return;state.screen=s;state.ui.statementClientId=null;render();}
+function goScreen(s){
+  if(!canSee(s))return;
+  state.screen=s;state.ui.statementClientId=null;render();
+  /* عند فتح شاشة المستخدمين أُعيد سحب مجموعة users من الخادم،
+     وعند فتح التقارير الرقابية أُعيد سحب audit_log (قراءة فقط). */
+  if(s==="users"&&SYNC.token){pullCollection("users").then(function(){render();}).catch(function(){});}
+  if(s==="audit"&&SYNC.token){pullCollection("audit_log").then(function(){render();}).catch(function(){});}
+}
 function renderApp(){
   var u=state.user;
   /* حارس الصلاحيات: إن كانت الشاشة الحالية غير مسموحة للمستخدم
@@ -1598,7 +1582,7 @@ function renderApp(){
   '<span id="syncBadge" class="sync-badge">…</span>'+
   '<span class="user-chip">'+esc(u.fullName||u.username)+' — '+esc(roleName(u.role))+(unread?' • <b>إشعارات غير مقروءة: '+unread+'</b>':"")+' <button type="button" class="btn btn-gold btn-sm" onclick="logout()">خروج</button></span></header>'+
   navHtml()+'<main id="main"></main>'+
-  '<footer>قاعدة الشركة: <span class="num">MSHRY_company</span> • معرّف الشركة على الخادم: <span class="num">mshry-default</span> • نسخة احتياطية واحدة: <span class="num">MSHRY_backup_company</span></footer>';
+  '<footer>متصل بالخادم — بيانات الشركة مشتركة • معرّف الشركة على الخادم: <span class="num">mshry-default</span></footer>';
   var m=$("main");
   if(state.screen==="dashboard")m.innerHTML=screenDashboard();
   else if(state.screen==="projects")m.innerHTML=screenProjects();
@@ -2198,6 +2182,7 @@ function screenReports(){
   });
   h+='<tr style="background:#eef1f5;font-weight:700"><td>الإجمالي الكلي</td><td class="num">'+fmtM(tb.total.opening)+'</td><td class="num">'+fmtM(tb.total.debit)+'</td><td class="num">'+fmtM(tb.total.credit)+'</td><td class="num">'+fmtM(tb.total.closing)+'</td></tr>';
   h+='</table></div>';
+  h+=journalHtml();
   return h;
 }
 function openStatement(cid){state.ui.statementClientId=cid;render();}
@@ -2218,7 +2203,7 @@ function screenUsers(){
   var h='<div class="card"><h2>المستخدمون</h2><p class="muted">إنشاء المستخدمين فقط من داخل النظام — بواسطة مدير النظام أو الحسابات — ولا يوجد تسجيل من شاشة الدخول. مدير النظام (1/1) يملك كل الصلاحيات دائماً ولا يُغيَّر دوره، والمدير العام تُمنح صلاحياته من هنا (افتراضياً: اعتماد العروض والتقارير فقط). الحذف وتعيين دور «مدير النظام» ومنح «التقارير الرقابية» لمدير النظام فقط.</p><div id="usrMsg"></div>'+
   '<h3>'+(eu?"تعديل المستخدم «"+esc(eu.username)+"»":"إضافة مستخدم جديد")+'</h3><div class="form-grid">'+
   '<div><label>اسم المستخدم *</label><input id="nuUser" class="inp" value="'+(eu?esc(eu.username):"")+'"'+(eu&&eu.username==="1"?" disabled":"")+'>'+(eu&&eu.username==="1"?'<p class="muted">اسم مدير النظام «1» لا يُغيَّر.</p>':"")+'</div>'+
-  '<div><label>كلمة المرور *</label><div class="pw-wrap"><input id="nuPass" type="password" class="inp" value="'+(eu?esc(eu.password||""):"")+'"><button type="button" class="eye" onclick="togglePwById(\'nuPass\')" title="إظهار / إخفاء كلمة المرور">👁</button></div></div>'+
+  '<div><label>كلمة المرور *</label><div class="pw-wrap"><input id="nuPass" type="password" class="inp" value="'+""+'"><button type="button" class="eye" onclick="togglePwById(\'nuPass\')" title="إظهار / إخفاء كلمة المرور">👁</button></div></div>'+
   '<div><label>الاسم الكامل</label><input id="nuName" class="inp" value="'+(eu?esc(eu.fullName||""):"")+'"></div>'+
   '<div><label>رقم الجوال (لإشعار واتساب عند الإسناد)</label><input id="nuPhone" class="inp" dir="ltr" value="'+(eu?esc(eu.phone||""):"")+'" placeholder="05xxxxxxxx"></div>'+
   '<div><label>الدور *</label><select id="nuRole" class="inp" onchange="applyRolePerms(this.value)"'+(eu&&eu.username==="1"?" disabled":"")+'>'+Object.keys(ROLES).filter(function(k){return isAdminUser()||k!=="admin";}).map(function(k){return '<option value="'+k+'"'+((eu?eu.role===k:k==="gm")?" selected":"")+'>'+esc(ROLES[k].name)+'</option>';}).join("")+'</select>'+(eu&&eu.username==="1"?'<p class="muted">دور مدير النظام «1» لا يُغيَّر.</p>':(!isAdminUser()?'<p class="muted">دور «مدير النظام» لا يظهر إلا لمدير النظام.</p>':""))+'</div>'+
@@ -2313,8 +2298,7 @@ function doAddLeave(){
 function screenNotifications(){
   var list=myNotifications();
   var h='<div class="card"><h2>الإشعارات</h2>';
-  if(SYNC.mode==="server")h+='<div class="row" style="margin-bottom:.6rem"><button type="button" class="btn btn-navy" onclick="syncRefresh()">تحديث البيانات من الخادم</button><span id="syncStatus" class="muted"></span></div>';
-  else h+='<p class="warn">المزامنة مع الخادم غير مفعّلة هنا: أنت في الوضع المحلي والبيانات على هذا الجهاز فقط. عند توفر قاعدة الخادم على نفس الموقع ستظهر حالة «متصل بالخادم» في الترويسة ويعمل زر التحديث.</p>';
+  h+='<div class="row" style="margin-bottom:.6rem"><button type="button" class="btn btn-navy" onclick="syncRefresh()">تحديث البيانات من الخادم</button><span id="syncStatus" class="muted"></span></div>';
   if(!list.length)h+='<p class="muted">لا توجد إشعارات لك حالياً.</p>';
   list.forEach(function(n){
     h+='<div class="notif'+(n.read?"":" unread")+'"><b>'+esc(n.title)+'</b><div>'+esc(n.body)+'</div><div class="time">'+esc(String(n.createdAt).slice(0,16).replace("T"," "))+(n.read?"":" — غير مقروء")+'</div>'+
@@ -2331,11 +2315,11 @@ function screenSettings(){
   '<div><label>نسبة الضريبة %</label><input id="stVat" type="number" min="0" step="0.5" class="inp" value="'+esc(s.vatRate)+'"></div></div>'+
   '<div class="row" style="margin-top:.6rem"><button type="button" class="btn btn-navy" onclick="doSaveSettings()">حفظ الإعدادات</button>'+
   '<button type="button" class="btn btn-gold" onclick="askSetup()">⚙ تهيئة النظام</button></div>'+
-  '<h3>قاعدة البيانات</h3><p>مفتاح التخزين المحلي: <b class="num">MSHRY_company</b> — النسخة الاحتياطية الواحدة: <b class="num">MSHRY_backup_company</b> — معرّف الشركة على الخادم: <b class="num">mshry-default</b> (منفصل تماماً عن أي نظام آخر على المشروع نفسه).</p>'+
+  '<h3>قاعدة البيانات</h3><p>البيانات محفوظة مركزياً على الخادم في قاعدة البيانات الواحدة المشتركة — معرّف الشركة على الخادم: <b class="num">mshry-default</b> (منفصل تماماً عن أي نظام آخر على المشروع نفسه). لا تُحفظ أي بيانات عمل على هذا الجهاز.</p>'+
   '<div class="row"><button type="button" class="btn btn-ghost" onclick="downloadBackup()">تنزيل نسخة احتياطية (JSON)</button>'+
   '<label class="btn btn-ghost" style="cursor:pointer">استعادة من ملف نسخة<input type="file" accept=".json" class="hidden" onchange="restoreBackup(this)"></label></div>'+
   (isAdminUser()?resetSettingsHtml():"")+
-  '<p class="warn">العمل دون اتصال (أوفلاين) مرحلة ثانية: حالياً يعمل النظام في الوضع المحلي عند غياب الخادم ويحفظ على هذا الجهاز، وتُعاد مزامنة الحفظ عند عودة الاتصال — أما العمل الكامل دون اتصال من عدة أجهزة ثم الدمج فليس في هذه النسخة.</p>';
+  '<p class="warn">النظام يعمل متصلاً بالخادم فقط — عند انقطاع الاتصال تظهر رسالة واضحة ولا يُحفظ أي عمل على هذا الجهاز. العمل دون اتصال مرحلة ثانية مستقبلية.</p>';
   if(state.ui.setupAsk&&!state.ui.setupOpen){
     h+='<div class="card" style="border:2px solid var(--gold)"><h3>تهيئة النظام — أدخل الرمز</h3><div id="setupErr"></div>'+
     '<div class="form-grid"><div><label>رمز التهيئة</label><div class="pw-wrap"><input id="setupCodeIn" type="password" class="inp" placeholder="أدخل رمز التهيئة"><button type="button" class="eye" onclick="togglePwById(\'setupCodeIn\')" title="إظهار / إخفاء الرمز">👁</button></div></div></div>'+
@@ -2382,7 +2366,6 @@ function downloadBackup(){
     var blob=new Blob([JSON.stringify(backupSnapshot())],{type:"application/json"});
     var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="MSHRY-company.json";a.click();
     setTimeout(function(){try{URL.revokeObjectURL(a.href);}catch(e){}},1000);
-    logAudit("backup","تنزيل نسخة احتياطية (بدون سجل التدقيق)","","الإعدادات");save();
   }catch(e){alert("تعذّر تنزيل النسخة.");}
 }
 function restoreBackup(input){
@@ -2395,35 +2378,90 @@ function restoreBackup(input){
       var s=JSON.parse(String(rd.result||""));
       if(!s||!s.settings){alert("ملف النسخة غير صالح.");return;}
       var keepUser=state.user;
-      var keepAudit=Array.isArray(state.audit_log)?state.audit_log.slice():[];
-      state=normalizeState(s);state.audit_log=keepAudit;state.user=keepUser;state.screen="dashboard";state.ui={};ensureAdminUser();
-      logAudit("restore","استرجاع نسخة احتياطية — بقي سجل التدقيق كما هو ("+keepAudit.length+" سجلاً قبل الاسترجاع)","","الإعدادات");
-      saveLocal();render();
-      alert("تمت الاستعادة من النسخة.");
+      var snap=normalizeState(s);
+      /* الاستعادة خادمية: احذف سجلات الخادم الحالية ثم انشر سجلات
+         النسخة عبر POST. سجل التدقيق لا يُمس إطلاقاً (لا حذف ولا نشر).
+         مجموعة users استثناء: تُحذف فقط السجلات الغائبة عن النسخة —
+         حتى لا تُحذف كلمات المرور المُجزأة بنشر سجلات بلا password. */
+      var colls=SAVE_COLLECTIONS.slice();
+      var chain=Promise.resolve();var errors=[];
+      colls.forEach(function(coll){
+        chain=chain.then(function(){
+          return apiGet(coll).catch(function(){return [];}).then(function(rows){
+            var snapIds={};(snap[coll]||[]).forEach(function(r){if(r&&r.id!==undefined)snapIds[String(r.id)]=1;});
+            var c2=Promise.resolve();
+            (rows||[]).forEach(function(r){
+              if(coll==="users"&&snapIds[String(r.id)])return;
+              c2=c2.then(function(){return apiDelete(coll,String(r.id)).catch(function(){errors.push(coll+":"+r.id);});});
+            });
+            return c2;
+          });
+        }).then(function(){
+          var rows=snap[coll]||[];
+          var c3=Promise.resolve();
+          rows.forEach(function(row){
+            if(!row||row.id===undefined)return;
+            c3=c3.then(function(){return apiPost(coll,String(row.id),row).catch(function(){errors.push(coll+":"+row.id);});});
+          });
+          return c3;
+        });
+      });
+      chain.then(function(){
+        state=snap;state.user=keepUser;state.screen="dashboard";state.ui={};
+        if(keepUser&&!userById(keepUser.id)){forceLogout("استُعيدت نسخة لا تحوي حسابك — سجّل الدخول مجدداً.");return;}
+        SAVE_COLLECTIONS.forEach(function(c){lastSaved[c]=JSON.stringify(state[c]||[]);});
+        render();
+        alert(errors.length?("تمت الاستعادة من النسخة مع "+errors.length+" خطأ — تحقق من الاتصال."):"تمت الاستعادة من النسخة.");
+      });
     }catch(e){alert("تعذّر قراءة ملف النسخة.");}
   };
   rd.readAsText(f);
 }
-/* ---------- الإقلاع ---------- */
+function renderServerError(){
+  var app=$("app");if(!app)return;
+  app.innerHTML='<div class="login-wrap"><div class="login-card"><div class="gold-bar"></div><h1>نظام إدارة مشاريع المقاولات</h1><div class="err">تعذّر الاتصال بالخادم — تحقق من الإنترنت وحاول مجدداً.</div><div style="margin-top:1rem"><button type="button" class="btn btn-navy" onclick="boot()">إعادة المحاولة</button></div></div></div>';
+}
+/* ---------- الإقلاع: خادم فقط ----------
+   بلا توكن: شاشة الدخول (تتحقق من الاتصال وتُظهر حالته).
+   بتوكن محفوظ: يُتحقق منه باستدعاء خادمي؛ 401 يمسح التوكن ويعرض
+   الدخول؛ فشل الشبكة يعرض شاشة خطأ حاجبة ولا يدخل النظام. */
 function boot(){
   render();
-  var _mk0=getResetMarker();if(_mk0&&_mk0.at)SYNC.resetAt=_mk0.at;
-  syncCheck().then(function(isServer){
-    if(isServer&&SYNC.token){syncPullFromServer().then(function(){render();});}
-  });
+  var savedToken=null;
+  try{savedToken=localStorage.getItem(TOKEN_KEY);}catch(e){}
+  if(savedToken){
+    SYNC.token=savedToken;
+    syncCheck().then(function(ok){
+      if(!ok){renderServerError();return;}
+      return pullAllFromServer().then(function(){
+        var me=sessionUserFromToken();
+        var full=me?(userById(me.userId)||findUserByName(me.username)):null;
+        if(!full){clearToken();render();return;}
+        if(full.active===false){clearToken();state.ui.sessionMsg="هذا الحساب موقوف — راجع مدير النظام.";render();return;}
+        state.user={id:full.id,username:full.username,fullName:full.fullName||full.username,role:full.role,permissions:Array.isArray(full.permissions)?full.permissions.slice():null,rev:Number(full.rev)||1};
+        state.screen=(full.role==="technician")?"tasks":(full.role==="hr"?"employees":(full.role==="storekeeper"?"materials":(full.role==="secretariat"?"contracts":"dashboard")));
+        render();
+      }).catch(function(e){
+        if(e&&/401/.test(String(e.message||""))){clearToken();render();return;}
+        renderServerError();
+      });
+    });
+  }else{
+    syncCheck().then(function(){syncNote();});
+  }
   if(typeof document!=="undefined"&&document.addEventListener){
-    document.addEventListener("visibilitychange",function(){if(!document.hidden&&SYNC.mode==="server"&&SYNC.token)syncPullFromServer().then(function(){render();});});
+    document.addEventListener("visibilitychange",function(){if(!document.hidden&&SYNC.token&&state.user){pullAllFromServer().then(function(){render();}).catch(function(){});}});
   }
 }
 /* واجهة الاختبار: دوال الحالة والمنطق متاحة عالمياً */
 window.MSHRY={
-  state:function(){return state;},SYNC:SYNC,COMPANY_KEY:COMPANY_KEY,COMPANY_ID:COMPANY_ID,
+  state:function(){return state;},SYNC:SYNC,TOKEN_KEY:TOKEN_KEY,COMPANY_ID:COMPANY_ID,
   COLLECTIONS:COLLECTIONS,ROLES:ROLES,FULL_PERMS:FULL_PERMS,
-  loadState:loadState,defState:defState,saveLocal:saveLocal,save:save,
+  loadState:loadState,defState:defState,save:save,
   nextSerial:nextSerial,peekSerial:peekSerial,isSerialUsed:isSerialUsed,
-  syncCheck:syncCheck,syncMergeRows:syncMergeRows,syncPullFromServer:syncPullFromServer,
-  syncPushNow:syncPushNow,syncRefresh:syncRefresh,
-  doLogin:doLogin,localLogin:localLogin,logout:logout,
+  syncCheck:syncCheck,pullAllFromServer:pullAllFromServer,pullCollection:pullCollection,
+  syncRefresh:syncRefresh,apiGet:apiGet,apiPost:apiPost,apiDelete:apiDelete,queueDelete:queueDelete,
+  doLogin:doLogin,logout:logout,
   addClient:addClient,addProject:addProject,assignTechnicians:assignTechnicians,
   confirmReceipt:confirmReceipt,addMedia:addMedia,submitInspection:submitInspection,
   pmDecision:pmDecision,quoteTotals:quoteTotals,createQuotation:createQuotation,
@@ -2442,8 +2480,7 @@ window.MSHRY={
   accountMovements:accountMovements,accMonthly:accMonthly,expenseBreakdown:expenseBreakdown,
   setupCode:setupCode,checkSetupCode:checkSetupCode,saveSetupSettings:saveSetupSettings,
   resetSystem:resetSystem,doResetSystem:doResetSystem,askReset:askReset,closeReset:closeReset,
-  getResetMarker:getResetMarker,applyResetMarkerTo:applyResetMarkerTo,rowTime:rowTime,
-  RESET_KEY:RESET_KEY,RESET_COLL:RESET_COLL,
+  RESET_COLL:RESET_COLL,
   printQuotation:printQuotation,printHtml:printHtml,quotePrintHtml:quotePrintHtml,
   waLinkForQuote:waLinkForQuote,sendQuoteWhatsApp:sendQuoteWhatsApp,
   buildTrialCSV:buildTrialCSV,buildStatementCSV:buildStatementCSV,
@@ -2465,9 +2502,13 @@ window.MSHRY={
   qMaintState:qMaintState,qMaintToggle:qMaintToggle,qMaintField:qMaintField,
   userScreens:userScreens,canSee:canSee,isAdminUser:isAdminUser,closeItemPicker:closeItemPicker,closeItemSuggest:closeItemSuggest,
   openItemPicker:openItemPicker,pickItem:pickItem,applyRolePerms:applyRolePerms,
-  validateSession:validateSession,forceLogout:forceLogout,ensureAdminUser:ensureAdminUser,
+  validateSession:validateSession,forceLogout:forceLogout,
   auditDisplayUser:auditDisplayUser,ROLE_SCREENS:ROLE_SCREENS,PERM_SCREENS:PERM_SCREENS,
-  SCREEN_TITLES:SCREEN_TITLES,isGM:isGM,isAccounts:isAccounts
+  SCREEN_TITLES:SCREEN_TITLES,isGM:isGM,isAccounts:isAccounts,
+  postJournal:postJournal,journalEntries:journalEntries,journalHtml:journalHtml,
+  accountLinks:accountLinks,saveAccountLinks:saveAccountLinks,
+  accountLinksHtml:accountLinksHtml,doSaveAccountLinks:doSaveAccountLinks,
+  issuedTotals:issuedTotals,issueCostUnit:issueCostUnit
 };
 boot();
 
@@ -2485,9 +2526,7 @@ function doResetSystem(){
   return resetSystem(code).then(function(r){
     if(btn)btn.disabled=false;
     if(r.error){var e=$("resetErr");if(e)e.innerHTML='<div class="err">'+esc(r.error)+'</div>';else if(typeof alert==="function")alert(r.error);return r;}
-    try{sessionStorage.setItem("MSHRY_reset_done",r.at);}catch(e2){}
-    if(typeof location!=="undefined"&&location&&typeof location.reload==="function"){try{location.reload();}catch(e3){render();}}
-    else{render();}
+    render();
     return r;
   });
 }
@@ -2495,7 +2534,8 @@ function backupSnapshot(){
   /* نسخة البيانات للتنزيل: سجل التدقيق لا يُشمل فيها أبداً — يبقى في
      النظام ولا يُسترجع من نسخة قديمة. */
   var snap=JSON.parse(JSON.stringify(state));
-  delete snap.audit_log;
+  delete snap.audit_log;delete snap.user;delete snap.ui;
+  (snap.users||[]).forEach(function(u){delete u.password;delete u.passwordHash;});
   return snap;
 }
 function cancelEditUser(){state.ui.editUserId=null;render();}
@@ -2611,6 +2651,7 @@ function screenAccounts(){
     h+='</table>';
   }
   h+='</div>';
+  h+=accountLinksHtml();
   /* بطاقة إدارة المستخدمين: تظهر لمن يملك صلاحية شاشة المستخدمين
      (مدير النظام ودور الحسابات) وتفتح شاشة المستخدمين مباشرة. */
   if(canSee("users")){
@@ -2622,7 +2663,8 @@ function screenAccounts(){
   '<button type="button" class="btn btn-green" onclick="showAccForm(\'revenue\')">➕ تسجيل إيراد</button>'+
   '<button type="button" class="btn btn-danger" onclick="showAccForm(\'expense\')">➖ تسجيل مصروف</button>'+
   '<button type="button" class="btn btn-ghost" onclick="showAccMoves()" style="background:rgba(255,255,255,.12);color:#fff">📋 سجل الحركات</button>'+
-  '<button type="button" class="btn btn-ghost" onclick="goScreen(\'reports\')" style="background:rgba(255,255,255,.12);color:#fff">📊 التقارير</button>'+
+  '<button type="button" class="btn btn-ghost" onclick="goScreen(\'reports\')" style="background:rgba(255,255,255,.12);color:#fff">📊 التقارير</button>' +
+  '<button type="button" class="btn btn-ghost" onclick="goScreen(\'reports\')" style="background:rgba(255,255,255,.12);color:#fff">📖 القيود المحاسبية</button>' +
   '<button type="button" class="btn btn-ghost" onclick="goScreen(\'settings\')" style="background:rgba(255,255,255,.12);color:#fff">⚙ الإعدادات</button>';
   if(state.ui.accForm){
     var isRev=state.ui.accForm==="revenue";
