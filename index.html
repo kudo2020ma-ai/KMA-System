@@ -3,11 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>نظام إدارة مشاريع المقاولات</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+<title>نظام إدارة المشاريع</title>
 <style>
-:root{--navy:#0f2a4a;--navy2:#163a63;--gold:#c9a227;--gold2:#e3c766;--bg:#f2f4f7;--card:#fff;--border:#d8dee6;--text:#1c2733;--muted:#66788c;--red:#b3261e;--green:#1e7d32;--amber:#8a6d00;--r:10px}
+:root{--navy:#0b2447;--navy2:#14335f;--gold:#c9a227;--gold2:#e3c766;--bg:#f2f4f7;--card:#fff;--border:#d8dee6;--text:#1c2733;--muted:#66788c;--red:#b3261e;--green:#1e7d32;--amber:#8a6d00;--r:10px}
 *{box-sizing:border-box}
-body{margin:0;font-family:"Segoe UI",Tahoma,Arial,sans-serif;background:var(--bg);color:var(--text)}
+body{margin:0;font-family:"IBM Plex Sans Arabic","Segoe UI",Tahoma,Arial,sans-serif;background:var(--bg);color:var(--text)}
 a{color:var(--navy)}
 .hidden{display:none!important}
 .muted{color:var(--muted);font-size:.9rem}
@@ -16,11 +19,12 @@ a{color:var(--navy)}
 .err{background:#fdecea;border:1px solid #e8a49f;color:var(--red);border-radius:8px;padding:.6rem .8rem;margin:.5rem 0;line-height:1.7}
 .okbox{background:#e8f5e9;border:1px solid #a5d6a7;color:var(--green);border-radius:8px;padding:.6rem .8rem;margin:.5rem 0;line-height:1.7}
 /* شاشة الدخول */
-.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1rem;background:linear-gradient(160deg,var(--navy) 0%,var(--navy2) 60%,#0a1d33 100%)}
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1rem;background:linear-gradient(160deg,var(--navy) 0%,var(--navy2) 60%,#081a30 100%)}
 .login-card{background:#fff;border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.35);width:100%;max-width:420px;padding:2rem 1.8rem}
 .login-card h1{color:var(--navy);text-align:center;margin:.2rem 0 .2rem;font-size:1.35rem}
 .login-card .sub{text-align:center;color:var(--muted);margin:0 0 1.2rem}
 .gold-bar{height:4px;background:var(--gold);border-radius:4px;margin:0 auto 1rem;width:90px}
+.login-icon{text-align:center;font-size:2.4rem;color:var(--gold);line-height:1.2}
 label{display:block;font-weight:600;margin:.7rem 0 .25rem}
 .inp{width:100%;padding:.6rem .7rem;border:1px solid var(--border);border-radius:8px;font-size:1rem;font-family:inherit}
 .inp:focus{outline:2px solid var(--gold);border-color:var(--gold)}
@@ -32,7 +36,7 @@ textarea.inp{resize:vertical;min-height:70px}
 .btn{display:inline-block;border:0;border-radius:8px;padding:.6rem 1.2rem;font-size:1rem;font-family:inherit;cursor:pointer;font-weight:700}
 .btn-navy{background:var(--navy);color:#fff;width:100%}
 .btn-navy:hover{background:var(--navy2)}
-.btn-gold{background:var(--gold);color:#231f00}
+.btn-gold{background:var(--gold);color:var(--navy)}
 .btn-ghost{background:#eef1f5;color:var(--navy)}
 .btn-danger{background:var(--red);color:#fff}
 .btn-green{background:var(--green);color:#fff}
@@ -47,11 +51,23 @@ header .brand span{color:var(--gold2)}
 .sync-badge.sync-warn{background:#b3261e;color:#fff}
 .user-chip{font-size:.9rem}
 .user-chip button{margin-right:.5rem}
-nav.tabs{background:#fff;border-bottom:2px solid var(--gold);display:flex;flex-wrap:wrap;gap:.2rem;padding:.3rem .8rem;position:sticky;top:52px;z-index:9}
-nav.tabs button{border:0;background:none;padding:.55rem .8rem;font-family:inherit;font-size:.95rem;cursor:pointer;border-radius:8px;color:var(--navy);font-weight:600}
-nav.tabs button.on{background:var(--navy);color:#fff}
-nav.tabs button:hover{background:#eef1f5}
-nav.tabs button.on:hover{background:var(--navy)}
+.app-shell{display:flex;min-height:100vh}
+.sidebar{width:16rem;flex:0 0 16rem;/* w-64 */background:var(--navy);color:#fff;min-height:100vh;position:sticky;top:0;height:100vh;overflow-y:auto;display:flex;flex-direction:column}
+.side-brand{padding:1rem 1.1rem .8rem;border-bottom:1px solid rgba(201,162,39,.5)}
+.side-brand .sys{font-weight:800;font-size:1.15rem;line-height:1.4}
+.side-brand .co{color:var(--gold2);font-size:.9rem;margin-top:.15rem}
+.side-nav{display:flex;flex-direction:column;gap:.15rem;padding:.7rem .6rem;flex:1}
+.side-nav button{border:0;background:none;padding:.6rem .8rem;font-family:inherit;font-size:.98rem;cursor:pointer;border-radius:8px;color:#dbe4ee;font-weight:600;text-align:right;width:100%}
+.side-nav button.on{background:var(--gold);color:var(--navy)}
+.side-nav button:hover{background:var(--navy2);color:#fff}
+.side-nav button.on:hover{background:var(--gold);color:var(--navy)}
+.content{flex:1;min-width:0;display:flex;flex-direction:column}
+.menu-btn{display:none}
+@media screen and (max-width:860px){
+  .sidebar{position:fixed;top:0;right:0;z-index:40;transform:translateX(100%);transition:transform .2s ease;box-shadow:-4px 0 20px rgba(0,0,0,.3)}
+  .sidebar.open{transform:none}
+  .menu-btn{display:inline-block;border:0;background:var(--navy);color:#fff;border-radius:8px;padding:.55rem .9rem;font-family:inherit;font-size:1rem;font-weight:700;cursor:pointer;margin:.6rem .6rem 0;align-self:flex-start}
+}
 main{max-width:1180px;margin:0 auto;padding:1rem}
 .card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:1rem 1.1rem;margin-bottom:1rem}
 .card h2{margin:.1rem 0 .7rem;color:var(--navy);font-size:1.15rem}
@@ -94,7 +110,7 @@ footer{text-align:center;color:var(--muted);font-size:.85rem;padding:1rem}
 #printArea{display:none}
 @media print{
   body{background:#fff}
-  #app,header,nav.tabs,footer{display:none!important}
+  #app,header,.sidebar,.menu-btn,footer{display:none!important}
   #printArea{display:block;position:static}
   @page{size:A4;margin:0}
   .print-page{page-break-after:always;box-shadow:none!important;margin:0!important}
@@ -150,9 +166,9 @@ footer{text-align:center;color:var(--muted);font-size:.85rem;padding:1rem}
 .acc .legend{font-size:.9rem;line-height:1.9}
 .acc .legend .dot{display:inline-block;width:12px;height:12px;border-radius:3px;margin-left:.3rem}
 @media screen and (max-width:760px){.acc .acc-grid{grid-template-columns:1fr}}
-@media screen and (max-width:640px){main{padding:.6rem}nav.tabs{top:96px}.stat .n{font-size:1.4rem}}
+@media screen and (max-width:640px){main{padding:.6rem}.stat .n{font-size:1.4rem}}
 /* نافذة اختيار الأصناف (F9) وقائمة الإكمال التلقائي */
-.item-modal{position:fixed;inset:0;background:rgba(15,42,74,.55);display:flex;align-items:flex-start;justify-content:center;padding:4rem 1rem 1rem;z-index:50}
+.item-modal{position:fixed;inset:0;background:rgba(11,36,71,.55);display:flex;align-items:flex-start;justify-content:center;padding:4rem 1rem 1rem;z-index:50}
 .item-modal-card{background:#fff;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.35);width:100%;max-width:560px;padding:1rem 1.2rem}
 .item-modal-card h3{margin:.1rem 0 .6rem;color:var(--navy)}
 .item-suggest{border:1px solid var(--border);background:#fff;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);margin-top:.25rem;max-height:220px;overflow:auto}
@@ -165,7 +181,7 @@ footer{text-align:center;color:var(--muted);font-size:.85rem;padding:1rem}
 <script>
 "use strict";
 /* ============================================================
-   نظام إدارة مشاريع المقاولات — نسخة الموقع v2 (ملف واحد)
+   نظام إدارة المشاريع — نسخة المساحة على الموقع (ملف واحد)
    خادم فقط — بلا أي تخزين على الجهاز إطلاقاً: لا تُقرأ بيانات العمل ولا
    تُكتب إلا عبر /api/* على الخادم؛ localStorage يحمل التوكن
    فقط (MSHRY_V2_TOKEN) ولا يحمل أي بيانات عمل. الخادم مرجع
@@ -201,24 +217,24 @@ var ROLES={
 };
 /* الصلاحيات: ما الذي يراه كل دور */
 var ROLE_SCREENS={
-  admin:["dashboard","projects","tasks","quotations","approvals","materials","returns","contracts","financial","accounts","reports","audit","users","employees","notifications","settings","items"],
+  admin:["dashboard","projects","my_tasks","quotations","approvals","materials","returns","contracts","financial","accounts","reports","items","users","employees","audit","notifications","settings"],
   gm:["dashboard","projects","quotations","approvals","financial","accounts","reports","notifications","items"],
-  projects_manager:["dashboard","projects","tasks","quotations","approvals","notifications","items"],
-  technician:["tasks","notifications"],
+  projects_manager:["dashboard","projects","my_tasks","quotations","approvals","notifications","items"],
+  technician:["my_tasks","notifications"],
   accounts:["dashboard","materials","returns","financial","accounts","reports","notifications","items","users"],
   storekeeper:["materials","returns","notifications","items"],
   hr:["employees","notifications"],
   secretariat:["contracts","notifications"]
 };
 var SCREEN_TITLES={
-  dashboard:"لوحة المتابعة",projects:"إدارة المشاريع",tasks:"مهامي",
-  quotations:"عروض الأسعار",approvals:"التعميد (المدير العام)",
+  dashboard:"لوحة المتابعة",projects:"إدارة المشاريع",my_tasks:"مهامي",
+  quotations:"عروض الأسعار",approvals:"التعميد",
   materials:"صرف المواد",returns:"مرتجع المواد",contracts:"العقود",financial:"الاعتماد المالي والمديونيات",
   accounts:"إدارة الحسابات",
   reports:"التقارير — ميزان المراجعة",audit:"التقارير الرقابية",users:"المستخدمون",employees:"الموظفون والإجازات",
   notifications:"الإشعارات",settings:"الإعدادات",items:"الأصناف"
 };
-var PERM_SCREENS=["dashboard","projects","tasks","quotations","approvals","materials","returns","contracts","financial","accounts","reports","audit","users","employees","notifications","settings","items"];
+var PERM_SCREENS=["dashboard","projects","my_tasks","quotations","approvals","materials","returns","contracts","financial","accounts","reports","items","users","employees","audit","notifications","settings"];
 var FULL_PERMS=PERM_SCREENS.slice();
 function $(id){return document.getElementById(id);}
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
@@ -484,7 +500,7 @@ function doLogin(){
     if(u.active===false){fail("هذا الحساب موقوف — راجع مدير النظام.");return false;}
     state.user={id:u.id,username:u.username,fullName:u.fullName||u.username,role:u.role,permissions:Array.isArray(u.permissions)?u.permissions.slice():null,rev:Number(u.rev)||1};
     state.ui.sessionMsg=null;
-    state.screen=(u.role==="technician")?"tasks":(u.role==="hr"?"employees":(u.role==="storekeeper"?"materials":(u.role==="secretariat"?"contracts":"dashboard")));
+    state.screen=(u.role==="technician")?"my_tasks":(u.role==="hr"?"employees":(u.role==="storekeeper"?"materials":(u.role==="secretariat"?"contracts":"dashboard")));
     if(err)err.classList.add("hidden");
     render();
     return true;
@@ -1000,7 +1016,7 @@ function buildTechnicianWhatsApp(projectId,technicianId){
   var t=userById(technicianId);if(!t)return {error:"الفني غير موجود."};
   var phone=normalizePhone(t.phone);
   if(!phone)return {error:"رقم جوال الفني «"+(t.fullName||t.username)+"» غير مسجل — سجّله من شاشة المستخدمين أولاً."};
-  var msg="لديك مهمة جديدة في نظام إدارة مشاريع المقاولات — سجّل دخولك بيوزرك لعرض المهام واعتمادها\n"+SITE_URL;
+  var msg="لديك مهمة جديدة في نظام إدارة المشاريع — سجّل دخولك بيوزرك لعرض المهام واعتمادها\n"+SITE_URL;
   return {url:"https://wa.me/"+phone+"?text="+encodeURIComponent(msg),phone:phone,technicianId:t.id,projectId:p.id};
 }
 function buildTrialCSV(){
@@ -1533,7 +1549,8 @@ function renderLogin(){
   $("app").innerHTML=
   '<div class="login-wrap"><div class="login-card">'+
   '<div class="gold-bar"></div>'+
-  '<h1>نظام إدارة مشاريع المقاولات</h1>'+
+  '<div class="login-icon" aria-hidden="true">◆</div>'+ 
+  '<h1>نظام إدارة المشاريع</h1>'+
   '<p class="sub">تركيب كاميرات • صيانة • توريد أدوات سلامة • مضخات</p>'+
   '<div id="loginErr" class="err hidden"></div><div id="loginOk" class="hidden"></div>'+
   '<label for="loginUser">اسم المستخدم</label>'+
@@ -1541,7 +1558,7 @@ function renderLogin(){
   '<label for="loginPass">كلمة المرور</label>'+
   '<div class="pw-wrap"><input id="loginPass" type="password" class="inp" autocomplete="current-password" placeholder="كلمة المرور" onkeydown="loginKey(event,\'pass\')">'+
   '<button type="button" class="eye" onclick="togglePw()" title="إظهار / إخفاء كلمة المرور">👁</button></div>'+
-  '<div style="margin-top:1rem"><button type="button" class="btn btn-navy" onclick="doLogin()">دخول</button></div>'+
+  '<div style="margin-top:1rem"><button type="button" class="btn btn-gold" style="width:100%" onclick="doLogin()">تسجيل الدخول</button></div>'+
   '<p class="muted" style="margin-top:1rem;line-height:1.7">الدخول الأول لمدير النظام: اسم المستخدم <b class="num">1</b> وكلمة المرور <b class="num">1</b>. لا يوجد تسجيل من هذه الشاشة — إنشاء المستخدمين يتم من داخل النظام بواسطة مدير النظام أو الحسابات.</p>'+
   '<p id="loginModeNote" class="muted" style="line-height:1.7"></p>'+
   '</div></div>';
@@ -1554,14 +1571,18 @@ function renderLogin(){
   if(rd){var lo=$("loginOk");if(lo){lo.innerHTML='<div class="okbox">تم تصفير النظام بنجاح — النظام الآن فارغ تماماً. سجّل الدخول بحساب مدير النظام (1/1) للبدء من جديد.</div>';lo.classList.remove("hidden");}}
   var u=$("loginUser");if(u)try{u.focus();}catch(e){}
 }
-function navHtml(){
-  var screens=["dashboard","projects","tasks","quotations","approvals","materials","returns","contracts","financial","accounts","reports","items","audit","users","employees","notifications","settings"];
+function toggleSidebar(){var sb=$("sidebar");if(sb)sb.classList.toggle("open");}
+function sidebarHtml(){
+  /* الشريط الجانبي الكحلي: اسم النظام والشركة فوقه، والشاشات الـ17
+     بالترتيب المعتمد. */
+  var screens=["dashboard","projects","my_tasks","quotations","approvals","materials","returns","contracts","financial","accounts","reports","items","users","employees","audit","notifications","settings"];
   var h="";
   screens.forEach(function(s){if(canSee(s))h+='<button type="button" class="'+(state.screen===s?"on":"")+'" onclick="goScreen(\''+s+'\')">'+esc(SCREEN_TITLES[s])+'</button>';});
-  return '<nav class="tabs">'+h+'</nav>';
+  return '<aside class="sidebar" id="sidebar"><div class="side-brand"><div class="sys">نظام إدارة المشاريع</div><div class="co">'+esc(companyInfo().companyName)+'</div></div><nav class="side-nav">'+h+'</nav></aside>';
 }
 function goScreen(s){
   if(!canSee(s))return;
+  var sb=$("sidebar");if(sb)sb.classList.remove("open");
   state.screen=s;state.ui.statementClientId=null;render();
   /* عند فتح شاشة المستخدمين أُعيد سحب مجموعة users من الخادم،
      وعند فتح التقارير الرقابية أُعيد سحب audit_log (قراءة فقط). */
@@ -1578,15 +1599,20 @@ function renderApp(){
   }
   var unread=myNotifications().filter(function(n){return !n.read;}).length;
   $("app").innerHTML=
-  '<header><div class="brand">نظام إدارة مشاريع المقاولات <span>| '+esc(companyInfo().companyName)+'</span></div>'+
+  '<div class="app-shell">'+
+  '<button type="button" class="menu-btn" onclick="toggleSidebar()">☰ القائمة</button>'+
+  sidebarHtml()+
+  '<div class="content">'+
+  '<header><div class="brand">'+esc(companyInfo().companyName)+' <span>| نظام إدارة المشاريع</span></div>'+
   '<span id="syncBadge" class="sync-badge">…</span>'+
   '<span class="user-chip">'+esc(u.fullName||u.username)+' — '+esc(roleName(u.role))+(unread?' • <b>إشعارات غير مقروءة: '+unread+'</b>':"")+' <button type="button" class="btn btn-gold btn-sm" onclick="logout()">خروج</button></span></header>'+
-  navHtml()+'<main id="main"></main>'+
-  '<footer>متصل بالخادم — بيانات الشركة مشتركة • معرّف الشركة على الخادم: <span class="num">mshry-default</span></footer>';
+  '<main id="main"></main>'+
+  '<footer>متصل بالخادم — بيانات الشركة مشتركة • معرّف الشركة على الخادم: <span class="num">mshry-default</span></footer>'+
+  '</div></div>';
   var m=$("main");
   if(state.screen==="dashboard")m.innerHTML=screenDashboard();
   else if(state.screen==="projects")m.innerHTML=screenProjects();
-  else if(state.screen==="tasks")m.innerHTML=screenTasks();
+  else if(state.screen==="my_tasks")m.innerHTML=screenTasks();
   else if(state.screen==="quotations")m.innerHTML=screenQuotations();
   else if(state.screen==="approvals")m.innerHTML=screenApprovals();
   else if(state.screen==="materials")m.innerHTML=screenMaterials();
@@ -2419,7 +2445,7 @@ function restoreBackup(input){
 }
 function renderServerError(){
   var app=$("app");if(!app)return;
-  app.innerHTML='<div class="login-wrap"><div class="login-card"><div class="gold-bar"></div><h1>نظام إدارة مشاريع المقاولات</h1><div class="err">تعذّر الاتصال بالخادم — تحقق من الإنترنت وحاول مجدداً.</div><div style="margin-top:1rem"><button type="button" class="btn btn-navy" onclick="boot()">إعادة المحاولة</button></div></div></div>';
+  app.innerHTML='<div class="login-wrap"><div class="login-card"><div class="gold-bar"></div><h1>نظام إدارة المشاريع</h1><div class="err">تعذّر الاتصال بالخادم — تحقق من الإنترنت وحاول مجدداً.</div><div style="margin-top:1rem"><button type="button" class="btn btn-gold" style="width:100%" onclick="boot()">إعادة المحاولة</button></div></div></div>';
 }
 /* ---------- الإقلاع: خادم فقط ----------
    بلا توكن: شاشة الدخول (تتحقق من الاتصال وتُظهر حالته).
@@ -2439,7 +2465,7 @@ function boot(){
         if(!full){clearToken();render();return;}
         if(full.active===false){clearToken();state.ui.sessionMsg="هذا الحساب موقوف — راجع مدير النظام.";render();return;}
         state.user={id:full.id,username:full.username,fullName:full.fullName||full.username,role:full.role,permissions:Array.isArray(full.permissions)?full.permissions.slice():null,rev:Number(full.rev)||1};
-        state.screen=(full.role==="technician")?"tasks":(full.role==="hr"?"employees":(full.role==="storekeeper"?"materials":(full.role==="secretariat"?"contracts":"dashboard")));
+        state.screen=(full.role==="technician")?"my_tasks":(full.role==="hr"?"employees":(full.role==="storekeeper"?"materials":(full.role==="secretariat"?"contracts":"dashboard")));
         render();
       }).catch(function(e){
         if(e&&/401/.test(String(e.message||""))){clearToken();render();return;}
