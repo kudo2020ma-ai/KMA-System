@@ -1,27 +1,80 @@
-// مكتبة مشتركة لدوال نظام إدارة مشاريع المقاولات: التوكن (HMAC) + طبقة التخزين.
-// وضعان:
-//  1) الإنتاج (Vercel): عند وجود DATABASE_URL تُستخدم Vercel Postgres.
-//  2) التطوير المحلي: عند غياب DATABASE_URL يُستخدم ملف JSON محلي.
-//     ⚠️ المخزن المحلي للتطوير والاختبار فقط — ليس للإنتاج ولا يُزامَن
-//     بين الأجهزة، وبياناته تبقى على جهاز واحد فقط. وعلى Vercel تحديداً
-//     لا يدوم أبداً: نظام ملفات النشر للقراءة فقط (الكتابة تفشل)، وكل
-//     استدعاء لدالة بلا خادم قد يعمل على نسخة مؤقتة مختلفة (حتى الكتابة
-//     الناجحة في /tmp تختفي). لذلك يرفض /api/data الكتابة في هذا الوضع
-//     على Vercel بـ 503، ويعامل العميل وضع local-json كوضع محلي.
+// مكتبة مشتركة لدوال نظام إدارة مشاريع المقاولات v2: التوكن (HMAC) + طبقة التخزين.
+// التخزين الوحيد في الإنتاج هو Vercel Postgres (عند وجود DATABASE_URL).
+// لا يوجد وضع محلي إطلاقًا في هذا الكود: لا ملف JSON محلي — حُذف نهائيًا.
+// وترفض الواجهات العمل بـ 503 حتى تُربط قاعدة البيانات.
+// للاختبارات فقط: مخزن ذاكرة داخل العملية يُفعَّل بإحدى طريقتين:
+//   - دالة setTestStore(store) يستدعيها ملف الاختبار داخل العملية، أو
+//   - متغير البيئة MSHRY_TEST_MODE=1 فينشئ مخزن ذاكرة داخل العملية نفسها.
+//   والوضع في هذه الحالة 'test'. لا ملفات، ولا وضع افتراضي غير Postgres.
+// كلمات المرور: scrypt فقط (scrypt$<saltHex>$<hashHex>) — لا نص صريح
+// ولا SHA-256 قديم؛ قاعدة البيانات فارغة وبداية جديدة.
 
 const crypto = require('crypto');
-const fs = require('fs');
-const path = require('path');
 
 const DEV_SECRET_FALLBACK = 'dev-only-change-me-NOT-FOR-PRODUCTION';
 const DEFAULT_COMPANY_ID = 'mshry-default';
+const ADMIN_USERNAME = '1';
+
+// الشاشات الـ 17 الكاملة لمدير النظام (كما في النظام القديم).
+const FULL_PERMS = [
+  'dashboard', 'projects', 'tasks', 'quotations', 'approvals',
+  'materials', 'returns', 'contracts', 'financial', 'accounts',
+  'reports', 'audit', 'users', 'employees', 'notifications',
+  'settings', 'items',
+];
+
+// الصلاحيات الافتراضية لكل دور عند إنشاء مستخدم دون تحديد صلاحيات.
+const ROLE_SCREENS = {
+  admin: FULL_PERMS.slice(),
+  gm: ['dashboard', 'projects', 'quotations', 'approvals', 'financial', 'accounts', 'reports', 'notifications', 'items'],
+  projects: ['dashboard', 'projects', 'tasks', 'quotations', 'approvals', 'notifications', 'items'],
+  projects_manager: ['dashboard', 'projects', 'tasks', 'quotations', 'approvals', 'notifications', 'items'],
+  technician: ['tasks', 'notifications'],
+  accounts: ['dashboard', 'materials', 'returns', 'financial', 'accounts', 'reports', 'notifications', 'items', 'users'],
+  storekeeper: ['materials', 'returns', 'notifications', 'items'],
+  hr: ['employees', 'notifications'],
+  secretariat: ['contracts', 'notifications'],
+};
+
+// ---------- مخزن الذاكرة للاختبار فقط (داخل العملية، بلا ملفات) ----------
+let testStore = null; // { records: [...] } أو كائن بخدمات list/get/upsert/delete
+
+function setTestStore(store) {
+  if (!store) {
+    testStore = { records: [] };
+  } else if (Array.isArray(store)) {
+    testStore = { records: store };
+  } else if (Array.isArray(store.records)) {
+    testStore = store;
+  } else if (
+    typeof store.listRecords === 'function' &&
+    typeof store.upsertRecord === 'function'
+  ) {
+    testStore = store;
+  } else {
+    testStore = { records: [] };
+  }
+  return testStore;
+}
+
+function isTestMode() {
+  if (testStore) return true;
+  return process.env.MSHRY_TEST_MODE === '1';
+}
+
+function getTestStore() {
+  if (!testStore) testStore = { records: [] };
+  return testStore;
+}
 
 function isPostgresMode() {
   return Boolean(process.env.DATABASE_URL);
 }
 
 function getMode() {
-  return isPostgresMode() ? 'postgres' : 'local-json';
+  if (isPostgresMode()) return 'postgres';
+  if (isTestMode()) return 'test';
+  return 'none';
 }
 
 function getJwtSecret() {
@@ -32,9 +85,35 @@ function isJwtSecretConfigured() {
   return Boolean(process.env.JWT_SECRET);
 }
 
+// ---------- كلمات المرور: scrypt فقط ----------
+// الصيغة المخزنة: scrypt$<saltHex>$<hashHex>
+// المعاملات: N=16384, r=8, p=1, keylen=64.
+
+function hashPassword(pw) {
+  const salt = crypto.randomBytes(16);
+  const hash = crypto.scryptSync(String(pw), salt, 64, { N: 16384, r: 8, p: 1 });
+  return 'scrypt$' + salt.toString('hex') + '$' + hash.toString('hex');
+}
+
+function verifyPassword(stored, supplied) {
+  if (!stored || typeof stored !== 'string') return false;
+  const parts = stored.split('$');
+  if (parts.length !== 3 || parts[0] !== 'scrypt') return false;
+  try {
+    const salt = Buffer.from(parts[1], 'hex');
+    const expected = Buffer.from(parts[2], 'hex');
+    if (!salt.length || expected.length !== 64) return false;
+    const actual = crypto.scryptSync(String(supplied), salt, 64, { N: 16384, r: 8, p: 1 });
+    if (actual.length !== expected.length) return false;
+    return crypto.timingSafeEqual(actual, expected);
+  } catch (e) {
+    return false;
+  }
+}
+
 // ---------- التوكن: JWT مبسّط بتوقيع HMAC-SHA256، بلا اعتماديات ----------
 // الصيغة: base64url(header).base64url(payload).base64url(signature)
-// الـ payload: { username, fullName, role, companyId, rev, exp }
+// الـ payload: { username, fullName, role, permissions, userId, companyId, rev, jti, exp }
 // rev = رقم نسخة المستخدم لحظة إصدار التوكن؛ عند أي تعديل على المستخدم
 // (رمز/دور/صلاحيات) يرتفع rev في سجله، فتُرفض توكناته القديمة في /api/data.
 
@@ -48,6 +127,8 @@ function createToken(user, companyId) {
     username: user.username,
     fullName: user.fullName || user.username,
     role: user.role || 'user',
+    permissions: Array.isArray(user.permissions) ? user.permissions.slice() : [],
+    userId: user.userId || user.id || user.username,
     companyId: companyId || DEFAULT_COMPANY_ID,
     rev: Number(user.rev) || 1,
     jti: crypto.randomBytes(12).toString('base64url'), // معرّف فريد لكل توكن
@@ -56,19 +137,21 @@ function createToken(user, companyId) {
   const payload = base64url(JSON.stringify(payloadObj));
   const signature = crypto
     .createHmac('sha256', getJwtSecret())
-    .update(`${header}.${payload}`)
+    .update(header + '.' + payload)
     .digest('base64url');
-  return `${header}.${payload}.${signature}`;
+  return header + '.' + payload + '.' + signature;
 }
 
 function verifyToken(token) {
   if (!token || typeof token !== 'string') return null;
   const parts = token.split('.');
   if (parts.length !== 3) return null;
-  const [header, payload, signature] = parts;
+  const header = parts[0];
+  const payload = parts[1];
+  const signature = parts[2];
   const expected = crypto
     .createHmac('sha256', getJwtSecret())
-    .update(`${header}.${payload}`)
+    .update(header + '.' + payload)
     .digest('base64url');
   const sigBuf = Buffer.from(signature);
   const expBuf = Buffer.from(expected);
@@ -77,7 +160,7 @@ function verifyToken(token) {
   let decoded;
   try {
     decoded = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
-  } catch {
+  } catch (e) {
     return null;
   }
   if (!decoded || !decoded.username) return null;
@@ -89,7 +172,7 @@ function verifyToken(token) {
 
 function setCors(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 }
 
@@ -102,7 +185,7 @@ function parseBody(req) {
   if (typeof req.body === 'string') {
     try {
       return JSON.parse(req.body);
-    } catch {
+    } catch (e) {
       return {};
     }
   }
@@ -136,34 +219,22 @@ function isValidName(value) {
 }
 
 // ---------- طبقة التخزين ----------
-// واجهة موحّدة يستخدمها auth.js و data.js، سواء كان الخلفية Postgres
-// أو ملف JSON المحلي. كل سجل: { company_id, collection, id, data, updated_at }
+// واجهة موحّدة يستخدمها auth.js و data.js.
+// الخلفية الوحيدة في الإنتاج: Postgres. وفي الاختبار: مخزن ذاكرة.
+// لا توجد أي خلفية ملفات. كل سجل: { company_id, collection, id, data, updated_at }
 
-function localDbPath() {
-  if (process.env.MSHRY_LOCAL_DB_PATH) return process.env.MSHRY_LOCAL_DB_PATH;
-  // بجانب مجلد api/ — أي في جذر المشروع: data/mshry-local.json
-  return path.join(__dirname, '..', 'data', 'mshry-local.json');
-}
-
-function readLocalDb() {
-  const file = localDbPath();
-  try {
-    const raw = fs.readFileSync(file, 'utf8');
-    const parsed = JSON.parse(raw);
-    if (parsed && Array.isArray(parsed.records)) return parsed.records;
-    return [];
-  } catch {
-    return [];
+class NoDatabaseError extends Error {
+  constructor() {
+    super('NO_DATABASE_CONFIGURED');
+    this.name = 'NoDatabaseError';
   }
 }
 
-function writeLocalDb(records) {
-  const file = localDbPath();
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, JSON.stringify({ records }, null, 2), 'utf8');
+function requireStore() {
+  if (!isPostgresMode() && !isTestMode()) throw new NoDatabaseError();
 }
 
-// --- Postgres (يُستدعى فقط عند وجود DATABASE_URL) ---
+// --- Postgres (يُستدعى فقط عند وجود DATABASE_URL؛ الاستدعاء كسول) ---
 async function pgList(companyId, collection) {
   const { sql } = require('@vercel/postgres');
   const { rows } = await sql`
@@ -201,80 +272,112 @@ async function pgDelete(companyId, collection, id) {
   return rowCount > 0;
 }
 
-// --- واجهة موحّدة ---
-
-async function listRecords(companyId, collection) {
-  if (isPostgresMode()) return pgList(companyId, collection);
-  return readLocalDb()
+// --- مخزن الذاكرة للاختبار فقط ---
+function memList(companyId, collection) {
+  const store = getTestStore();
+  if (typeof store.listRecords === 'function') return store.listRecords(companyId, collection);
+  return store.records
     .filter((r) => r.company_id === companyId && r.collection === collection)
     .sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)))
     .map((r) => ({ id: r.id, data: r.data, updated_at: r.updated_at }));
 }
 
-async function getRecord(companyId, collection, id) {
-  if (isPostgresMode()) return pgGet(companyId, collection, id);
-  const found = readLocalDb().find(
+function memGet(companyId, collection, id) {
+  const store = getTestStore();
+  if (typeof store.getRecord === 'function') return store.getRecord(companyId, collection, id);
+  const found = store.records.find(
     (r) => r.company_id === companyId && r.collection === collection && r.id === id
   );
   return found ? { id: found.id, data: found.data, updated_at: found.updated_at } : null;
 }
 
-async function upsertRecord(companyId, collection, id, data) {
-  if (isPostgresMode()) return pgUpsert(companyId, collection, id, data);
-  const records = readLocalDb();
+function memUpsert(companyId, collection, id, data) {
+  const store = getTestStore();
+  if (typeof store.upsertRecord === 'function') return store.upsertRecord(companyId, collection, id, data);
   const now = new Date().toISOString();
-  const idx = records.findIndex(
+  const idx = store.records.findIndex(
     (r) => r.company_id === companyId && r.collection === collection && r.id === id
   );
   const row = { company_id: companyId, collection, id, data, updated_at: now };
-  if (idx >= 0) records[idx] = row;
-  else records.push(row);
-  writeLocalDb(records);
+  if (idx >= 0) store.records[idx] = row;
+  else store.records.push(row);
   return { id, data, updated_at: now };
 }
 
-async function deleteRecord(companyId, collection, id) {
-  if (isPostgresMode()) return pgDelete(companyId, collection, id);
-  const records = readLocalDb();
-  const kept = records.filter(
+function memDelete(companyId, collection, id) {
+  const store = getTestStore();
+  if (typeof store.deleteRecord === 'function') return store.deleteRecord(companyId, collection, id);
+  const before = store.records.length;
+  store.records = store.records.filter(
     (r) => !(r.company_id === companyId && r.collection === collection && r.id === id)
   );
-  const removed = kept.length !== records.length;
-  if (removed) writeLocalDb(kept);
-  return removed;
+  return before !== store.records.length;
+}
+
+// --- واجهة موحّدة ---
+
+async function listRecords(companyId, collection) {
+  requireStore();
+  if (isPostgresMode()) return pgList(companyId, collection);
+  return memList(companyId, collection);
+}
+
+async function getRecord(companyId, collection, id) {
+  requireStore();
+  if (isPostgresMode()) return pgGet(companyId, collection, id);
+  return memGet(companyId, collection, id);
+}
+
+async function upsertRecord(companyId, collection, id, data) {
+  requireStore();
+  if (isPostgresMode()) return pgUpsert(companyId, collection, id, data);
+  return memUpsert(companyId, collection, id, data);
+}
+
+async function deleteRecord(companyId, collection, id) {
+  requireStore();
+  if (isPostgresMode()) return pgDelete(companyId, collection, id);
+  return memDelete(companyId, collection, id);
 }
 
 // هل أُبطل هذا التوكن بتعديل على المستخدم بعد إصداره؟
 // يُقارن rev في التوكن مع rev في سجل المستخدم الحالي؛ عند الاختلاف
 // يكون التوكن مبطلاً (تغيّرت كلمة المرور أو الدور أو الصلاحيات).
-// - لا سجل للمستخدم بعد (توكن التهيئة الأولى) → غير مبطل.
-// - خطأ في قاعدة البيانات → غير مبطل (فتح عند الخطأ حتى لا تُقفل
-//   البيانات كلها بعطل عابر؛ الإبطال الأساسي يفرضه النظام في الواجهة
-//   عبر validateSession عند كل عرض).
+// - لا سجل للمستخدم بعد → مبطل (فشل مغلق: مستخدم محذوف أو غير موجود
+//   لا يجوز أن تبقى توكناته صالحة).
+// - خطأ في قاعدة البيانات → مبطل (فشل مغلق) بدل الفتح عند الخطأ
+//   في النسخة القديمة؛ فتعطّل القاعدة لا يفتح البيانات للجميع.
 async function isTokenRevoked(decoded) {
   try {
-    if (!decoded || !decoded.username) return false;
+    if (!decoded || !decoded.username) return true;
     const companyId = decoded.companyId || DEFAULT_COMPANY_ID;
     let row = await getRecord(companyId, 'users', decoded.username);
     if (!row) {
       const all = await listRecords(companyId, 'users');
       row = all.find((r) => r.data && r.data.username === decoded.username) || null;
     }
-    if (!row || !row.data) return false;
+    if (!row || !row.data) return true;
     const storedRev = Number(row.data.rev) || 1;
     const tokenRev = Number(decoded.rev) || 1;
     return storedRev !== tokenRev;
   } catch (e) {
-    return false;
+    return true;
   }
 }
 
 module.exports = {
   DEFAULT_COMPANY_ID,
+  ADMIN_USERNAME,
+  FULL_PERMS,
+  ROLE_SCREENS,
   getMode,
   isPostgresMode,
+  isTestMode,
+  setTestStore,
   getJwtSecret,
   isJwtSecretConfigured,
+  hashPassword,
+  verifyPassword,
   createToken,
   verifyToken,
   isTokenRevoked,
@@ -288,5 +391,5 @@ module.exports = {
   getRecord,
   upsertRecord,
   deleteRecord,
-  localDbPath,
+  NoDatabaseError,
 };
